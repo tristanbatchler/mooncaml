@@ -20,10 +20,16 @@ type ui =
   ; mutable height : int
   }
 
+(** A simple editable line with a cursor position. *)
+type edit_line =
+  { mutable text : string
+  ; mutable cursor : int (** Byte offset within [text]. *)
+  }
+
 type state =
   { ui : ui
   ; mutable log : string list (** Messages stored newest-first. *)
-  ; chat_buf : Buffer.t
+  ; chat : edit_line
   ; mutable player_x : int
   ; mutable player_y : int
   ; mutable mode : input_mode
@@ -61,7 +67,8 @@ let create_windows ui =
   ui.map_win <- Curses.newwin map_h w 0 0;
   ui.log_win <- Curses.newwin log_height w map_h 0;
   ui.chat_win <- Curses.newwin chat_height w (map_h + log_height) 0;
-  Curses.scrollok ui.log_win true
+  Curses.scrollok ui.log_win true;
+  ignore (Curses.keypad ui.chat_win true)
 ;;
 
 let handle_resize ui =
@@ -95,20 +102,60 @@ let draw_log state =
   ignore (Curses.wrefresh w)
 ;;
 
+let chat_prompt = "> "
+let chat_prompt_len = String.length chat_prompt
+
 let draw_chat state =
   let w = state.ui.chat_win in
   Curses.werase w;
-  let text =
-    match state.mode with
-    | Chat -> "> " ^ Buffer.contents state.chat_buf
-    | Game -> "Press ENTER to chat"
-  in
-  ignore (Curses.mvwaddstr w 0 0 text);
-  Curses.wclrtoeol w;
+  (match state.mode with
+   | Game ->
+     ignore (Curses.mvwaddstr w 0 0 "Press ENTER to chat");
+     ignore (Curses.curs_set 0)
+   | Chat ->
+     ignore (Curses.mvwaddstr w 0 0 (chat_prompt ^ state.chat.text));
+     Curses.wclrtoeol w;
+     ignore (Curses.wmove w 0 (chat_prompt_len + state.chat.cursor));
+     ignore (Curses.curs_set 1));
   ignore (Curses.wrefresh w)
 ;;
 
 (* ── Input handling ─────────────────────────────────────────────── *)
+
+let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
+
+let edit_clear ed =
+  ed.text <- "";
+  ed.cursor <- 0
+;;
+
+let edit_insert ed ch =
+  let c = ed.cursor in
+  let before = String.sub ed.text 0 c in
+  let after = String.sub ed.text c (String.length ed.text - c) in
+  ed.text <- before ^ String.make 1 (Char.chr ch) ^ after;
+  ed.cursor <- c + 1
+;;
+
+let edit_backspace ed =
+  let c = ed.cursor in
+  if c > 0
+  then (
+    let before = String.sub ed.text 0 (c - 1) in
+    let after = String.sub ed.text c (String.length ed.text - c) in
+    ed.text <- before ^ after;
+    ed.cursor <- c - 1)
+;;
+
+let edit_delete ed =
+  let c = ed.cursor in
+  let len = String.length ed.text in
+  if c < len
+  then (
+    let before = String.sub ed.text 0 c in
+    let after = String.sub ed.text (c + 1) (len - c - 1) in
+    ed.text <- before ^ after)
+;;
 
 let handle_game_input state ch =
   if ch = Curses.Key.up
@@ -119,29 +166,38 @@ let handle_game_input state ch =
   then state.player_x <- state.player_x - 1
   else if ch = Curses.Key.right
   then state.player_x <- state.player_x + 1
-  else if ch = Char.code '\n'
+  else if ch = Curses.Key.enter || ch = Char.code '\n'
   then (
     state.mode <- Chat;
-    Buffer.clear state.chat_buf);
+    edit_clear state.chat);
   add_log state (Printf.sprintf "Moved to %d,%d" state.player_x state.player_y)
 ;;
 
 let handle_chat_input state ch =
-  if ch = Char.code '\n'
+  let ed = state.chat in
+  if ch = Curses.Key.enter || ch = Char.code '\n'
   then (
-    if Buffer.length state.chat_buf > 0 then add_log state (Buffer.contents state.chat_buf);
+    if String.length ed.text > 0 then add_log state ed.text;
     state.mode <- Game;
-    Buffer.clear state.chat_buf)
-  else if ch = 27 (* ESC *)
+    edit_clear ed)
+  else if ch = Char.code '\x1b'
   then (
     state.mode <- Game;
-    Buffer.clear state.chat_buf)
-  else if ch = Curses.Key.backspace || ch = 127 (* DEL *)
-  then (
-    let len = Buffer.length state.chat_buf in
-    if len > 0 then Buffer.truncate state.chat_buf (len - 1))
-  else if ch >= 32 && ch <= 126
-  then Buffer.add_char state.chat_buf (Char.chr ch)
+    edit_clear ed)
+  else if ch = Curses.Key.backspace || ch = Char.code '\x7f'
+  then edit_backspace ed
+  else if ch = Curses.Key.dc
+  then edit_delete ed
+  else if ch = Curses.Key.left
+  then (if ed.cursor > 0 then ed.cursor <- ed.cursor - 1)
+  else if ch = Curses.Key.right
+  then (if ed.cursor < String.length ed.text then ed.cursor <- ed.cursor + 1)
+  else if ch = Curses.Key.home
+  then ed.cursor <- 0
+  else if ch = Curses.Key.end_
+  then ed.cursor <- String.length ed.text
+  else if is_printable ch
+  then edit_insert ed ch
 ;;
 
 (* ── Main ───────────────────────────────────────────────────────── *)
@@ -164,7 +220,7 @@ let () =
   in
   create_windows ui;
   let state =
-    { ui; log = []; chat_buf = Buffer.create 256; player_x = 10; player_y = 5; mode = Game }
+    { ui; log = []; chat = { text = ""; cursor = 0 }; player_x = 10; player_y = 5; mode = Game }
   in
   add_log state "Welcome to the roguelike UI skeleton.";
   ignore (Curses.refresh ());
