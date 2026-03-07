@@ -1,2 +1,5 @@
 (library
- (name mooncaml))
+ (name mooncaml)
+ (libraries sexplib)
+ (preprocess
+  (pps ppx_sexp_conv)))

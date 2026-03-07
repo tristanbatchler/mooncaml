@@ -1,4 +1,7 @@
 open Lwt.Syntax
+open Mooncaml
+
+(* open Sexplib *)
 module IntMap = Map.Make (Int)
 
 type client = {
@@ -31,31 +34,40 @@ let remove_client client =
   in
   Lwt.return ()
 
-let handle_say_packet _args client =
-  let* () = Lwt_io.printlf "Client %d says something" client.id in
+let handle_say_packet msg client =
+  let* () = Lwt_io.printlf "Client %d says: %s" client.id msg in
   let* () = Lwt_io.write_line client.oc "Congrats on saying something!" in
   Lwt.return ()
 
-let handle_move_packet _args client =
-  let* () = Lwt_io.printlf "Client %d moves somewhere" client.id in
+let handle_move_packet (x, y) client =
+  let* () = Lwt_io.printlf "Client %d moves to (%d, %d)" client.id x y in
   let* () = Lwt_io.write_line client.oc "Congrats on moving!" in
   Lwt.return ()
 
 let handle_packet packet client =
-  let* () = Lwt_io.printlf "Handling packet: %s" packet in
-  let parts =
-    packet |> String.lowercase_ascii |> String.trim |> String.split_on_char ' '
+  let* () =
+    Lwt_io.printlf "Handling packet: %s" (Packet.string_of_packet packet)
   in
-  match parts with
-  | "say" :: args -> handle_say_packet args client
-  | "move" :: args -> handle_move_packet args client
-  | _ -> Lwt_io.printl "Unknown packet type"
+  match packet with
+  | Packet.Say msg -> handle_say_packet msg client
+  | Packet.Move (x, y) -> handle_move_packet (x, y) client
+  | exception exn ->
+      let* () =
+        Lwt_io.printlf "Error handling packet: %s" (Printexc.to_string exn)
+      in
+      Lwt.return ()
 
 let rec client_loop client =
   let* line_opt = Lwt_io.read_line_opt client.ic in
   match line_opt with
   | Some line ->
-      let* () = handle_packet line client in
+      let* () =
+        match Packet.packet_of_string line with
+        | Ok packet -> handle_packet packet client
+        | Error err ->
+            Lwt_io.eprintlf "Error parsing packet from client %d: %s" client.id
+              err
+      in
       client_loop client
   | None -> Lwt.return_unit
 
