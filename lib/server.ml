@@ -1,19 +1,43 @@
 open Lwt.Syntax
+module IntMap = Map.Make (Int)
 
-let handle_packet packet (client : State.client) =
-  let* () = Lwt_io.printlf "Handling packet: %s" (Packet.string_of_packet packet) in
-  match packet with
-  | Packet.Say msg ->
-    let* () = Lwt_io.printlf "Client %d says: %s" client.id msg in
-    let* () = Lwt_io.write_line client.oc "Congrats on saying something!" in
-    Lwt.return ()
-  | Packet.Move (x, y) ->
-    let* () = Lwt_io.printlf "Client %d moves to (%d, %d)" client.id x y in
-    let* () = Lwt_io.write_line client.oc "Congrats on moving!" in
-    Lwt.return ()
+type server =
+  { clients : Client.t IntMap.t
+  ; next_client_id : int
+  ; num_connected_clients : int
+  }
+
+let server_state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
+
+let add_client ic oc =
+  let state = !server_state in
+  let client : Client.t = { id = state.next_client_id; ic; oc } in
+  let new_clients = IntMap.add client.id client state.clients in
+  server_state
+  := { clients = new_clients
+     ; next_client_id = state.next_client_id + 1
+     ; num_connected_clients = state.num_connected_clients + 1
+     };
+  client
 ;;
 
-let rec client_loop (client : State.client) =
+let remove_client client_id =
+  let state = !server_state in
+  server_state
+  := { state with
+       clients = IntMap.remove client_id state.clients
+     ; num_connected_clients = state.num_connected_clients - 1
+     }
+;;
+
+let handle_packet packet (client : Client.t) =
+  let* () = Lwt_io.printlf "Handling packet: %s" (Packet.string_of_packet packet) in
+  match packet with
+  | Packet.Say msg -> Game.handle_say msg client
+  | Packet.Move (x, y) -> Game.handle_move (x, y) client
+;;
+
+let rec client_loop (client : Client.t) =
   let* line_opt = Lwt_io.read_line_opt client.ic in
   match line_opt with
   | None -> Lwt.return_unit
@@ -26,14 +50,14 @@ let rec client_loop (client : State.client) =
     client_loop client
 ;;
 
-let handle_client (client : State.client) =
+let handle_client (client : Client.t) =
   Lwt.finalize
     (fun () -> client_loop client)
     (fun () ->
        let* () = Lwt_io.printlf "Cleaning up client %d" client.id in
-       State.remove_client client.id;
+       remove_client client.id;
        let* () =
-         Lwt_io.printlf "Currently %d clients connected" (State.get_num_connected_clients ())
+         Lwt_io.printlf "Currently %d clients connected" !server_state.num_connected_clients
        in
        let* () = Lwt_io.close client.ic in
        Lwt_io.close client.oc)
@@ -46,12 +70,12 @@ let connection_handler client_addr (ic, oc) =
       Lwt_io.printlf "Accepted connection from %s:%d" (Unix.string_of_inet_addr inet_addr) port
     | _ -> Lwt_io.eprintlf "Rejected connection from unsupported address type"
   in
-  let client = State.add_client ic oc in
+  let client = add_client ic oc in
   let* () =
     Lwt_io.printlf
       "Client %d connected: currently %d clients connected"
       client.id
-      (State.get_num_connected_clients ())
+      !server_state.num_connected_clients
   in
   handle_client client
 ;;
