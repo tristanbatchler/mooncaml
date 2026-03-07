@@ -168,13 +168,14 @@ let () =
   in
   add_log state "Welcome to the roguelike UI skeleton.";
   ignore (Curses.refresh ());
+  Curses.timeout 50;
   let rec main_loop () =
     handle_resize state.ui;
     draw_map state;
     draw_log state;
     draw_chat state;
     let ch = Curses.getch () in
-    if ch <> Curses.Key.resize
+    if ch <> -1 && ch <> Curses.Key.resize
     then (
       match state.mode with
       | Chat -> handle_chat_input state ch
