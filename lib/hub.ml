@@ -1,4 +1,11 @@
 open Lwt.Syntax
+
+let src =
+  Logs.Src.create "mooncaml.hub" ~doc:"The central hub that orchestrates client interactions"
+;;
+
+module Log = (val Logs.src_log src : Logs.LOG)
+module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
 module IntMap = Map.Make (Int)
 
 type t =
@@ -8,7 +15,11 @@ type t =
   }
 
 let state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
-let modify f = state := f !state
+
+let modify f =
+  state := f !state;
+  Log.debug (fun m -> m "Currently %d clients connected" !state.num_connected_clients)
+;;
 
 let broadcast packet sender_id =
   let clients = !state.clients in
@@ -45,7 +56,8 @@ let rec client_loop (client : Client.t) =
     let* () =
       match Packet.packet_of_string line with
       | Ok packet -> Client.handle_packet packet client.id client
-      | Error err -> Lwt_io.eprintlf "Error parsing packet from client %d: %s" client.id err
+      | Error err ->
+        Log_lwt.err (fun m -> m "Error parsing packet from client %d: %s" client.id err)
     in
     client_loop client
 ;;
@@ -54,9 +66,10 @@ let handle_client (client : Client.t) =
   Lwt.finalize
     (fun () -> client_loop client)
     (fun () ->
-       let* () = Lwt_io.printlf "Cleaning up client %d" client.id in
+       let* () =
+         Log_lwt.info (fun m -> m "Disconnected" ~tags:(Logging.tag_with_client client.id))
+       in
        remove_client client.id;
-       let* () = Lwt_io.printlf "Currently %d clients connected" !state.num_connected_clients in
        let* () = Lwt_io.close client.ic in
        Lwt_io.close client.oc)
 ;;

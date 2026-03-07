@@ -1,5 +1,10 @@
 open Lwt.Syntax
 
+let src = Logs.Src.create "mooncaml.client" ~doc:"Interaction layer for connected clients"
+
+module Log = (val Logs.src_log src : Logs.LOG)
+module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
+
 type t =
   { id : int
   ; broadcast : Packet.t -> int -> unit Lwt.t
@@ -26,7 +31,14 @@ let handle_move (packet : Packet.t) sender_id client =
 ;;
 
 let handle_packet packet sender_id client =
-  let* () = Lwt_io.printlf "Handling packet: %s" (Packet.string_of_packet packet) in
+  let* () =
+    Log_lwt.debug (fun m ->
+      m
+        "Handling packet from client %d: %s"
+        sender_id
+        (Packet.string_of_packet packet)
+        ~tags:(Logging.tag_with_client client.id))
+  in
   match packet with
   | Packet.Say _ -> handle_say packet sender_id client
   | Packet.Move _ -> handle_move packet sender_id client

@@ -1,5 +1,5 @@
 (executable
  (public_name mooncaml)
  (name main)
- (libraries mooncaml lwt lwt.unix sexplib)
+ (libraries mooncaml lwt logs logs.lwt )
  (modes exe byte))

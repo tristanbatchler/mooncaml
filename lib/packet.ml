@@ -1,5 +1,9 @@
 open Sexplib.Std
 
+let src = Logs.Src.create "mooncaml.packet" ~doc:"Network packets"
+
+module Log = (val Logs.src_log src : Logs.LOG)
+
 type t =
   | Say of string
   | Move of int * int
