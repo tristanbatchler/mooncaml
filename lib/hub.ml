@@ -10,8 +10,16 @@ type t =
 let state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
 let modify f = state := f !state
 
+let broadcast packet sender_id =
+  let clients = !state.clients in
+  Lwt_list.iter_p
+    (fun (cid, client) ->
+       if cid <> sender_id then Client.handle_packet packet sender_id client else Lwt.return_unit)
+    (IntMap.bindings clients)
+;;
+
 let add_client ic oc =
-  let client : Client.t = { id = !state.next_client_id; ic; oc } in
+  let client : Client.t = { id = !state.next_client_id; broadcast; ic; oc } in
   modify (fun st ->
     let new_clients = IntMap.add client.id client st.clients in
     { clients = new_clients
@@ -36,7 +44,7 @@ let rec client_loop (client : Client.t) =
   | Some line ->
     let* () =
       match Packet.packet_of_string line with
-      | Ok packet -> Client.handle_packet packet client
+      | Ok packet -> Client.handle_packet packet client.id client
       | Error err -> Lwt_io.eprintlf "Error parsing packet from client %d: %s" client.id err
     in
     client_loop client
