@@ -1,12 +1,14 @@
 open Sexplib.Std
 
-let src = Logs.Src.create "mooncaml.packet" ~doc:"Network packets"
+let src = Logs.Src.create "mooncaml_shared.packet" ~doc:"Network packets"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 type t =
   | Say of string
+  | SayResponse of (bool * string)
   | Move of int * int
+  | MoveResponse of (bool * string)
   | Disconnect
 [@@deriving sexp]
 

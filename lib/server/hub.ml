@@ -2,7 +2,7 @@ open Lwt.Syntax
 open Mooncaml_shared
 
 let src =
-  Logs.Src.create "mooncaml.hub" ~doc:"The central hub that orchestrates client interactions"
+  Logs.Src.create "mooncaml_server.hub" ~doc:"The central hub that orchestrates client interactions"
 ;;
 
 module Log = (val Logs.src_log src : Logs.LOG)

@@ -1,4 +1,4 @@
-let src = Logs.Src.create "mooncaml.logging" ~doc:"The logging module itself"
+let src = Logs.Src.create "mooncaml_shared.logging" ~doc:"The logging module itself"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 

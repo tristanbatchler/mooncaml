@@ -1,6 +1,6 @@
 open Lwt.Syntax
 
-let src = Logs.Src.create "mooncaml.server" ~doc:"Low-level server operations"
+let src = Logs.Src.create "mooncaml_server.server" ~doc:"Low-level server operations"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
