@@ -1,0 +1,5 @@
+(executable
+ (public_name moonlapse)
+ (name main)
+ (libraries moonlapse lwt lwt.unix)
+ (modes exe byte))
