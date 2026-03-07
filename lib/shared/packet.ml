@@ -10,6 +10,7 @@ type t =
   | Move of int * int
   | MoveResponse of (bool * string)
   | Disconnect
+  | ServerError of string
 [@@deriving sexp]
 
 let packet_of_string s =

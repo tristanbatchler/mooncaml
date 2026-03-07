@@ -58,7 +58,11 @@ let rec client_loop (client : Client.t) =
       match Packet.packet_of_string line with
       | Ok packet -> Client.handle_packet packet client.id client
       | Error err ->
-        Log_lwt.err (fun m -> m "Error parsing packet from client %d: %s" client.id err)
+        let* () =
+          Log_lwt.err (fun m -> m "Error parsing packet from client %d: %s" client.id err)
+        in
+        let response = Packet.ServerError (Printf.sprintf "Failed to parse packet: %s" err) in
+        Lwt_io.write_line client.oc (Packet.string_of_packet response)
     in
     client_loop client
 ;;
