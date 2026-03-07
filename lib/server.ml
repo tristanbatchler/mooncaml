@@ -1,33 +1,32 @@
 open Lwt.Syntax
 module IntMap = Map.Make (Int)
 
-type server =
+type t =
   { clients : Client.t IntMap.t
   ; next_client_id : int
   ; num_connected_clients : int
   }
 
-let server_state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
+let state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
+let modify f = state := f !state
 
 let add_client ic oc =
-  let state = !server_state in
-  let client : Client.t = { id = state.next_client_id; ic; oc } in
-  let new_clients = IntMap.add client.id client state.clients in
-  server_state
-  := { clients = new_clients
-     ; next_client_id = state.next_client_id + 1
-     ; num_connected_clients = state.num_connected_clients + 1
-     };
+  let client : Client.t = { id = !state.next_client_id; ic; oc } in
+  modify (fun st ->
+    let new_clients = IntMap.add client.id client st.clients in
+    { clients = new_clients
+    ; next_client_id = st.next_client_id + 1
+    ; num_connected_clients = st.num_connected_clients + 1
+    });
   client
 ;;
 
 let remove_client client_id =
-  let state = !server_state in
-  server_state
-  := { state with
-       clients = IntMap.remove client_id state.clients
-     ; num_connected_clients = state.num_connected_clients - 1
-     }
+  modify (fun st ->
+    { st with
+      clients = IntMap.remove client_id st.clients
+    ; num_connected_clients = st.num_connected_clients - 1
+    })
 ;;
 
 let handle_packet packet (client : Client.t) =
@@ -56,9 +55,7 @@ let handle_client (client : Client.t) =
     (fun () ->
        let* () = Lwt_io.printlf "Cleaning up client %d" client.id in
        remove_client client.id;
-       let* () =
-         Lwt_io.printlf "Currently %d clients connected" !server_state.num_connected_clients
-       in
+       let* () = Lwt_io.printlf "Currently %d clients connected" !state.num_connected_clients in
        let* () = Lwt_io.close client.ic in
        Lwt_io.close client.oc)
 ;;
@@ -75,7 +72,7 @@ let connection_handler client_addr (ic, oc) =
     Lwt_io.printlf
       "Client %d connected: currently %d clients connected"
       client.id
-      !server_state.num_connected_clients
+      !state.num_connected_clients
   in
   handle_client client
 ;;
