@@ -2,7 +2,7 @@
 
 (* ── Constants ──────────────────────────────────────────────────── *)
 
-let log_height = 6
+let log_height = 8
 let chat_height = 1
 let max_log = 256
 
@@ -203,6 +203,9 @@ let handle_chat_input state ch =
 (* ── Main ───────────────────────────────────────────────────────── *)
 
 let () =
+  (* Set ESCDELAY *before* initscr so that ncurses picks it up.
+     The default (1 000 ms) makes Escape feel unresponsive. *)
+  Unix.putenv "ESCDELAY" "25";
   let _stdscr = Curses.initscr () in
   at_exit Curses.endwin;
   ignore (Curses.cbreak ());
