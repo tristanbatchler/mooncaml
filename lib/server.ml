@@ -21,6 +21,5 @@ let start port =
   let sockaddr = Unix.(ADDR_INET (inet_addr_any, port)) in
   let* _ = Lwt_io.establish_server_with_client_address sockaddr connection_handler in
   let* () = Lwt_io.printlf "Server started on port %d" port in
-  let forever, _ = Lwt.wait () in
-  forever
+  fst @@ Lwt.wait ()
 ;;
