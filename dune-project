@@ -1,26 +1,28 @@
 (lang dune 3.7)
 
-(name moonlapse)
+(name mooncaml)
 
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github tristanbatchler/mooncaml))
 
-(authors "Author Name <author@example.com>")
+(authors "Tristan Batchler <info@tbat.me>")
 
-(maintainers "Maintainer Name <maintainer@example.com>")
+(maintainers "Tristan Batchler <info@tbat.me>")
 
-(license LICENSE)
+(license MIT)
 
-(documentation https://url/to/documentation)
+(documentation
+ https://github.com/tristanbatchler/mooncaml/blob/main/README.md)
 
 (package
- (name moonlapse)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (name mooncaml)
+ (synopsis "A Moonlapse MUD server implementation in OCaml")
+ (description
+  "Moonlapse MUD is a struggling-to-exist game. This is a failed attempt (calling it early) to bring it to existence with the power of functional programming. No, it's really just a fun way to spend my weekend. Oh well ¯\\_(ツ)_/¯")
  (depends ocaml dune)
  (tags
-  ("add topics" "to describe" your project)))
+  ("moonlapse" "mud" "game" "server")))
 
 (map_workspace_root false)
