@@ -32,6 +32,11 @@ let handle_client (client : State.client) =
     (fun () ->
        let* () = Lwt_io.printlf "Cleaning up client %d" client.id in
        State.remove_client client.id;
+       let* () =
+         Lwt_io.printlf
+           "Currently %d clients connected"
+           (Atomic.get State.current_state).num_connected_clients
+       in
        let* () = Lwt_io.close client.ic in
        Lwt_io.close client.oc)
 ;;
@@ -44,6 +49,12 @@ let connection_handler client_addr (ic, oc) =
     | _ -> Lwt_io.eprintlf "Rejected connection from unsupported address type"
   in
   let client = State.add_client ic oc in
+  let* () =
+    Lwt_io.printlf
+      "Client %d connected: currently %d clients connected"
+      client.id
+      (Atomic.get State.current_state).num_connected_clients
+  in
   handle_client client
 ;;
 
