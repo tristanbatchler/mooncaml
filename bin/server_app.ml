@@ -1,4 +1,5 @@
 open Mooncaml_server
+open Mooncaml_shared
 
 let setup_logging () =
   Fmt_tty.setup_std_outputs ();

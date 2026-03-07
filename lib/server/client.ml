@@ -1,4 +1,5 @@
 open Lwt.Syntax
+open Mooncaml_shared
 
 let src = Logs.Src.create "mooncaml.client" ~doc:"Interaction layer for connected clients"
 
