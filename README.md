@@ -11,7 +11,9 @@ eval $(opam env --switch=.)
 To compile and run: 
 
 ```shell
-dune exec mooncaml
+dune exec server_app
+# or
+dune exec client_app
 ```
 
 To contribute:

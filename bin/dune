@@ -1,5 +1,11 @@
 (executable
- (public_name mooncaml)
- (name main)
+ (public_name server_app)
+ (name server_app)
+ (libraries mooncaml lwt logs logs.lwt )
+ (modes exe byte))
+
+(executable
+ (public_name client_app)
+ (name client_app)
  (libraries mooncaml lwt logs logs.lwt )
  (modes exe byte))

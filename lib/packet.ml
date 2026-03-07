@@ -7,6 +7,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 type t =
   | Say of string
   | Move of int * int
+  | Disconnect
 [@@deriving sexp]
 
 let packet_of_string s =

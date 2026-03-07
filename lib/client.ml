@@ -30,6 +30,15 @@ let handle_move (packet : Packet.t) sender_id client =
   | _ -> raise (Invalid_argument "Received non-move packet in handle_move")
 ;;
 
+let handle_disconnect (packet : Packet.t) sender_id client =
+  match packet with
+  | Packet.Disconnect ->
+    if sender_id = client.id
+    then client.broadcast packet client.id
+    else Lwt_io.write_line client.oc (Printf.sprintf "Client %d has disconnected" sender_id)
+  | _ -> raise (Invalid_argument "Received non-disconnect packet in handle_disconnect")
+;;
+
 let handle_packet packet sender_id client =
   let* () =
     Log_lwt.debug (fun m ->
@@ -42,4 +51,5 @@ let handle_packet packet sender_id client =
   match packet with
   | Packet.Say _ -> handle_say packet sender_id client
   | Packet.Move _ -> handle_move packet sender_id client
+  | Packet.Disconnect -> handle_disconnect packet sender_id client
 ;;
