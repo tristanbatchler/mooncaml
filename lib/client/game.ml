@@ -10,6 +10,16 @@ let handle_move_other sender_id x y state =
 
 let handle_connect_other sender_id state = Input.add_logf "Client %d has connected" state sender_id
 
+let handle_about_other sender_id (player_info : Packet.player_info) state =
+  Input.add_logf
+    "Client %d is named %s and is at (%d, %d)"
+    state
+    sender_id
+    player_info.name
+    player_info.x
+    player_info.y
+;;
+
 let handle_disconnect_other sender_id state =
   Input.add_logf "Client %d has disconnected" state sender_id
 ;;
@@ -26,6 +36,10 @@ let handle_move_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to move: " ^ msg)
 ;;
 
+let handle_connect_me_response success msg state =
+  if success then state else state |> Input.add_log ("Failed to connect: " ^ msg)
+;;
+
 let handle_disconnect_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to disconnect: " ^ msg)
 ;;
@@ -36,11 +50,13 @@ let handle_packet (state : Types.state) packet =
   | Packet.SaysOther (sender_id, msg) -> state |> handle_says_other sender_id msg
   | Packet.MoveOther (sender_id, x, y) -> state |> handle_move_other sender_id x y
   | Packet.ConnectOther sender_id -> state |> handle_connect_other sender_id
+  | Packet.AboutOther (sender_id, player_info) -> state |> handle_about_other sender_id player_info
   | Packet.DisconnectOther sender_id -> state |> handle_disconnect_other sender_id
   (* From the server directly *)
   | Packet.UnexpectedServerError msg -> state |> handle_unexpected_server_error msg
   | Packet.SaysMeResponse (success, msg) -> state |> handle_says_me_response success msg
   | Packet.MoveMeResponse (success, msg) -> state |> handle_move_me_response success msg
+  | Packet.ConnectMeResponse (success, msg) -> state |> handle_connect_me_response success msg
   | Packet.DisconnectMeResponse (success, msg) -> state |> handle_disconnect_me_response success msg
   | _ -> state
 ;;

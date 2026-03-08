@@ -4,6 +4,15 @@ let src = Logs.Src.create "mooncaml_shared.packet" ~doc:"Network packets"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
+type player_info =
+  { name : string
+  ; x : int
+  ; y : int
+  }
+[@@deriving sexp]
+
+type response = bool * string [@@deriving sexp]
+
 type t =
   (* From the user *)
   | SaysMe of string
@@ -14,13 +23,14 @@ type t =
   | SaysOther of int * string
   | MoveOther of int * int * int
   | ConnectOther of int
+  | AboutOther of int * player_info
   | DisconnectOther of int
   (* From the server directly *)
   | UnexpectedServerError of string
-  | SaysMeResponse of (bool * string)
-  | MoveMeResponse of (bool * string)
-  | ConnectMeResponse of (bool * string)
-  | DisconnectMeResponse of (bool * string)
+  | SaysMeResponse of response
+  | MoveMeResponse of response
+  | ConnectMeResponse of response
+  | DisconnectMeResponse of response
 [@@deriving sexp]
 
 let packet_of_string s =

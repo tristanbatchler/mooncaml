@@ -9,6 +9,7 @@ module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
 type t =
   { id : int
   ; broadcast : Packet.t -> int -> unit Lwt.t
+  ; pass_to_other_client : int -> Packet.t -> unit Lwt.t
   ; ic : Lwt_io.input_channel
   ; oc : Lwt_io.output_channel
   }
@@ -57,10 +58,28 @@ let handle_connect_me (packet : Packet.t) sender_id client =
       let response = Packet.ConnectMeResponse (true, "Connected successfully") in
       Packet.send client.oc response
     else (
-      (* It came from another client, so pass it on to our connection *)
+      (* It came from another client, so pass it on to our connection and tell the new guy about us *)
       let connect_other_packet = Packet.ConnectOther sender_id in
-      Packet.send client.oc connect_other_packet)
+      let* () = Packet.send client.oc connect_other_packet in
+      let my_player_info = Packet.{ name = Printf.sprintf "Player%d" client.id; x = 0; y = 0 } in
+      let about_me_packet = Packet.AboutOther (client.id, my_player_info) in
+      client.pass_to_other_client sender_id about_me_packet)
   | _ -> raise (Invalid_argument "Received non-connect packet in handle_connect_me")
+;;
+
+let handle_about_other (packet : Packet.t) sender_id client =
+  match packet with
+  | Packet.AboutOther (other_client_id, _) ->
+    if sender_id <> other_client_id
+    then raise (Invalid_argument "Sender ID does not match player info ID in handle_about_other")
+    else if sender_id = client.id
+    then
+      raise
+        (Invalid_argument "Received about_other packet from our own client in handle_about_other")
+    else
+      (* It came from another client, so pass it on to our connection *)
+      Packet.send client.oc packet
+  | _ -> raise (Invalid_argument "Received non-about_other packet in handle_about_other")
 ;;
 
 let handle_disconnect_me (packet : Packet.t) sender_id client =
@@ -87,10 +106,13 @@ let handle_packet packet sender_id client =
         ~tags:(Logging.tag_with_client client.id))
   in
   match packet with
+  (* Directly from the connected user *)
   | Packet.SaysMe _ -> handle_says_me packet sender_id client
   | Packet.MoveMe _ -> handle_move_me packet sender_id client
   | Packet.ConnectMe -> handle_connect_me packet sender_id client
   | Packet.DisconnectMe -> handle_disconnect_me packet sender_id client
+  (* Passed on from another server client *)
+  | Packet.AboutOther _ -> handle_about_other packet sender_id client
   | _ ->
     Log_lwt.warn (fun m ->
       m "Received unrecognized packet from client %d: %s" sender_id (Packet.string_of_packet packet))
