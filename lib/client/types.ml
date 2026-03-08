@@ -26,4 +26,5 @@ type state =
   ; mode : input_mode
   ; send_packets : Packet.t list
   ; other_players : Entities.player IntMap.t
+  ; desired_location : int * int
   }

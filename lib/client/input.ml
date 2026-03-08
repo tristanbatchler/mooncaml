@@ -5,21 +5,21 @@ let add_log msg (state : Types.state) = { state with log = Util.take max_log (ms
 let add_logf fmt = Printf.ksprintf (fun msg state -> add_log msg state) fmt
 let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
 
-let move_player dx dy (state : Types.state) =
-  let x = state.player.x + dx in
-  let y = state.player.y + dy in
+let intend_move_player dx dy (state : Types.state) =
+  let desired_x = state.player.x + dx in
+  let desired_y = state.player.y + dy in
   { state with
-    player = { state.player with x; y }
-  ; send_packets = Packet.MoveCommand { x; y } :: state.send_packets
+    desired_location = desired_x, desired_y
+  ; send_packets = Packet.MoveCommand { x = desired_x; y = desired_y } :: state.send_packets
   }
 ;;
 
 let handle_game_input (state : Types.state) ch =
   match ch with
-  | c when c = Curses.Key.up -> state |> move_player 0 (-1)
-  | c when c = Curses.Key.down -> state |> move_player 0 1
-  | c when c = Curses.Key.left -> state |> move_player (-1) 0
-  | c when c = Curses.Key.right -> state |> move_player 1 0
+  | c when c = Curses.Key.up -> state |> intend_move_player 0 (-1)
+  | c when c = Curses.Key.down -> state |> intend_move_player 0 1
+  | c when c = Curses.Key.left -> state |> intend_move_player (-1) 0
+  | c when c = Curses.Key.right -> state |> intend_move_player 1 0
   | c when c = Curses.Key.enter || c = Char.code '\n' ->
     { state with mode = Chat; chat = Textbox.empty_edit }
   | _ -> state

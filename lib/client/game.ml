@@ -7,16 +7,24 @@ let handle_chat_event sender_id message state =
   state |> Input.add_logf "Client %d says: %s" sender_id message
 ;;
 
-let handle_move_event sender_id x y state =
-  state |> Input.add_logf "Client %d moved to (%d, %d)" sender_id x y
+let handle_move_event sender_id x y (state : Types.state) =
+  match Types.IntMap.find_opt sender_id state.other_players with
+  | Some other ->
+    let updated_other = { other with x; y } in
+    let updated_others = Types.IntMap.add sender_id updated_other state.other_players in
+    { state with other_players = updated_others }
+  | None ->
+    Logs.warn (fun m -> m "Received MoveEvent for unknown sender_id %d" sender_id);
+    state
 ;;
 
 let handle_connect_event sender_id state =
   state |> Input.add_logf "Client %d has connected" sender_id
 ;;
 
-let handle_player_info (player_info : Entities.player) state =
-  state |> Input.add_logf "%s appeared at (%d, %d)" player_info.name player_info.x player_info.y
+let handle_player_info (player_info : Entities.player) (state : Types.state) =
+  { state with other_players = Types.IntMap.add player_info.id player_info state.other_players }
+  |> Input.add_logf "%s appeared at (%d, %d)" player_info.name player_info.x player_info.y
 ;;
 
 let handle_disconnect_event sender_id state =
@@ -31,8 +39,15 @@ let handle_chat_command_response success msg state =
   if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
 ;;
 
-let handle_move_command_response success msg state =
-  if success then state else state |> Input.add_log ("Failed to move: " ^ msg)
+let handle_move_command_response success msg (state : Types.state) =
+  (* There are issues with this - one being moving feels ever so slighly delayed, 
+     another being that this response might be for a previous move command, which 
+     would snap the player back to a previous location unexpectedly *)
+  if success
+  then (
+    let x, y = state.desired_location in
+    { state with player = { state.player with x; y } })
+  else state |> Input.add_log ("Failed to move: " ^ msg)
 ;;
 
 let handle_disconnect_command_response success msg state =
@@ -121,15 +136,9 @@ let run ic oc () =
     ; mode = Types.World
     ; send_packets = []
     ; other_players = others_map
+    ; desired_location = player.x, player.y
     }
     |> Input.add_logf "Welcome, %s!" player.name
-  in
-  let initial_state =
-    List.fold_left
-      (fun st (p : Entities.player) ->
-         st |> Input.add_logf "%s is already here at (%d, %d)" p.name p.x p.y)
-      initial_state
-      other_players
   in
   game_loop initial_state ic oc
 ;;
