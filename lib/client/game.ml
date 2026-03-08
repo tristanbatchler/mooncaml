@@ -27,8 +27,9 @@ let handle_player_info (player_info : Entities.player) (state : Types.state) =
   |> Input.add_logf "%s appeared at (%d, %d)" player_info.name player_info.x player_info.y
 ;;
 
-let handle_disconnect_event sender_id state =
-  state |> Input.add_logf "Client %d has disconnected" sender_id
+let handle_disconnect_event sender_id (state : Types.state) =
+  { state with other_players = Types.IntMap.remove sender_id state.other_players }
+  |> Input.add_logf "Client %d has disconnected" sender_id
 ;;
 
 (* ----- From the server directly -------------------------- *)

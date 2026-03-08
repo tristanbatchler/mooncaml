@@ -86,6 +86,7 @@ let handle_client (client : Client.t) =
        let* () =
          Log_lwt.info (fun m -> m "Disconnected" ~tags:(Logging.tag_with_client client.id))
        in
+       let* () = broadcast (Packet.DisconnectEvent { sender_id = client.id }) client.id in
        remove_client client.id;
        let* () = Lwt_io.close client.ic in
        Lwt_io.close client.oc)
