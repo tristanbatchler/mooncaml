@@ -7,5 +7,19 @@
 (executable
  (public_name client_app)
  (name client_app)
- (libraries mooncaml_shared mooncaml_client lwt lwt.unix logs logs.lwt logs.fmt fmt.tty)
+ (libraries
+  mooncaml_shared
+  mooncaml_client
+  lwt
+  lwt.unix
+  logs
+  logs.lwt
+  logs.fmt
+  fmt.tty)
+ (modes exe byte))
+
+(executable
+ (public_name bmp2ml)
+ (name bmp2ml)
+ (libraries imagelib.unix fmt.tty logs logs.fmt fmt)
  (modes exe byte))

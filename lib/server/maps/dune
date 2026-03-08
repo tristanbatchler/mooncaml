@@ -1,0 +1,10 @@
+(library
+ (name mooncaml_server_maps)
+ (modules oasis))
+
+(rule
+ (mode promote)
+ (targets oasis.ml)
+ (deps %{bin:bmp2ml} %{workspace_root}/data/maps/oasis.bmp)
+ (action
+  (run %{bin:bmp2ml} --input-dir %{workspace_root}/data/maps --output-dir .)))
