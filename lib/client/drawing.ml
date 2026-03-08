@@ -24,15 +24,14 @@ let draw_terrain (state : Types.state) =
     for x = 0 to state.map.width - 1 do
       let glyph =
         match state.map.terrain_map.(y).(x) with
-        | Maps.Grass -> ","
+        | Grass -> ","
         | Dirt -> "."
         | Wall -> "#"
         | OutOfBounds -> " "
       in
       ignore (Curses.mvwaddstr w (y + 1) (x + 1) glyph)
     done
-  done;
-  ignore (Curses.wrefresh w)
+  done
 ;;
 
 let draw_players (state : Types.state) =
@@ -42,15 +41,13 @@ let draw_players (state : Types.state) =
   Types.IntMap.iter
     (fun _ (other : Entities.player) ->
        ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
-    state.other_players;
-  ignore (Curses.wrefresh state.ui.map_win)
+    state.other_players
 ;;
 
 let draw_map (state : Types.state) =
-  Curses.werase state.ui.map_win;
-  Curses.box state.ui.map_win 0 0;
   draw_terrain state;
-  draw_players state
+  draw_players state;
+  ignore (Curses.wrefresh state.ui.map_win)
 ;;
 
 let draw_log (state : Types.state) =
