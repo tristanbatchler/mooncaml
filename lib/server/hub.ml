@@ -51,7 +51,7 @@ let try_move client_id x y =
   | None -> false
   | Some player ->
     let player' = Entities.{ player with x; y } in
-    state := { st with players = IntMap.add client_id player' st.players };
+    modify (fun st -> { st with players = IntMap.add client_id player' st.players });
     true
 ;;
 

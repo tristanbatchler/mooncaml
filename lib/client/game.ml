@@ -18,10 +18,6 @@ let handle_move_event sender_id x y (state : Types.state) =
     state
 ;;
 
-let handle_connect_event sender_id state =
-  state |> Input.add_logf "Client %d has connected" sender_id
-;;
-
 let handle_player_info (player_info : Entities.player) (state : Types.state) =
   { state with other_players = Types.IntMap.add player_info.id player_info state.other_players }
   |> Input.add_logf "%s appeared at (%d, %d)" player_info.name player_info.x player_info.y
