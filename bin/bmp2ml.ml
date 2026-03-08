@@ -1,5 +1,40 @@
 (* bmp2ml.ml *)
-(* Convert BMP maps into one generated OCaml module with O(1) lookups by name. *)
+(* Convert BMP maps into one generated OCaml module with O(1) typed lookups by name. *)
+
+let split_words s =
+  let len = String.length s in
+  let rec loop i current acc =
+    if i = len
+    then if current = "" then List.rev acc else List.rev (current :: acc)
+    else (
+      let c = s.[i] in
+      if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+      then loop (i + 1) (current ^ String.make 1 c) acc
+      else if current = ""
+      then loop (i + 1) "" acc
+      else loop (i + 1) "" (current :: acc))
+  in
+  loop 0 "" []
+;;
+
+let capitalize_ascii s =
+  if s = ""
+  then s
+  else (
+    let first = String.make 1 (Char.uppercase_ascii s.[0]) in
+    let rest = String.sub s 1 (String.length s - 1) in
+    first ^ String.lowercase_ascii rest)
+;;
+
+let map_constructor_of_name name =
+  let words = split_words name in
+  let base =
+    match words with
+    | [] -> "Map"
+    | _ -> List.map capitalize_ascii words |> String.concat ""
+  in
+  if base.[0] >= '0' && base.[0] <= '9' then "Map" ^ base else base
+;;
 
 let terrain_of_rgb r g b =
   match r, g, b with
@@ -10,14 +45,14 @@ let terrain_of_rgb r g b =
   | _ -> "OutOfBounds"
 ;;
 
-let write_map_data oc filename image =
+let write_map_data oc filename ctor image =
   let name = Filename.chop_extension (Filename.basename filename) in
   let width = image.Image.width in
   let height = image.Image.height in
-  Printf.fprintf oc "  Hashtbl.replace maps_by_name %S {\n" name;
+  Printf.fprintf oc "  Hashtbl.replace maps_by_name %s {\n" ctor;
   Printf.fprintf oc "    width = %d;\n" width;
   Printf.fprintf oc "    height = %d;\n" height;
-  Printf.fprintf oc "    pixels = [|\n";
+  Printf.fprintf oc "    terrain_map = [|\n";
   for y = 0 to height - 1 do
     Printf.fprintf oc "      [|";
     for x = 0 to width - 1 do
@@ -28,10 +63,22 @@ let write_map_data oc filename image =
     Printf.fprintf oc "|]%s\n" (if y < height - 1 then ";" else "")
   done;
   Printf.fprintf oc "    |];\n";
-  Printf.fprintf oc "  };\n"
+  Printf.fprintf oc "  };\n";
+  Printf.fprintf oc "  Hashtbl.replace map_name_strings %s %S;\n" ctor name
 ;;
 
 let write_ml_file ~output_file filenames =
+  let map_entries =
+    List.map
+      (fun filename ->
+         let name = Filename.chop_extension (Filename.basename filename) in
+         name, map_constructor_of_name name)
+      filenames
+  in
+  let ctors = List.map snd map_entries in
+  let sorted_ctors = List.sort_uniq String.compare ctors in
+  if List.length sorted_ctors <> List.length ctors
+  then failwith "Map name collision: two files resolve to the same map_name constructor";
   let oc = open_out output_file in
   Fun.protect
     ~finally:(fun () -> close_out_noerr oc)
@@ -41,25 +88,35 @@ let write_ml_file ~output_file filenames =
        Printf.fprintf oc "type map_data = {\n";
        Printf.fprintf oc "  width : int;\n";
        Printf.fprintf oc "  height : int;\n";
-       Printf.fprintf oc "  pixels : Mooncaml_shared.Terrain.t array array;\n";
+       Printf.fprintf oc "  terrain_map : Mooncaml_shared.Terrain.t array array;\n";
        Printf.fprintf oc "}\n\n";
-       Printf.fprintf oc "let map_names : string list = [\n";
-       List.iter
-         (fun filename ->
-            let name = Filename.chop_extension (Filename.basename filename) in
-            Printf.fprintf oc "  %S;\n" name)
-         filenames;
+       Printf.fprintf oc "type map_name =\n";
+       List.iter (fun (_, ctor) -> Printf.fprintf oc "  | %s\n" ctor) map_entries;
+       Printf.fprintf oc "\n";
+       Printf.fprintf oc "let map_names : map_name list = [\n";
+       List.iter (fun (_, ctor) -> Printf.fprintf oc "  %s;\n" ctor) map_entries;
        Printf.fprintf oc "]\n\n";
-       Printf.fprintf oc "let maps_by_name : (string, map_data) Hashtbl.t =\n";
+       Printf.fprintf oc "let maps_by_name : (map_name, map_data) Hashtbl.t =\n";
+       Printf.fprintf oc "  Hashtbl.create %d\n\n" (max 1 (List.length filenames));
+       Printf.fprintf oc "let map_name_strings : (map_name, string) Hashtbl.t =\n";
        Printf.fprintf oc "  Hashtbl.create %d\n\n" (max 1 (List.length filenames));
        Printf.fprintf oc "let () =\n";
-       List.iter
-         (fun filename ->
+       List.iter2
+         (fun filename (_, ctor) ->
             let image = ImageLib_unix.openfile filename in
-            write_map_data oc filename image)
-         filenames;
+            write_map_data oc filename ctor image)
+         filenames
+         map_entries;
        Printf.fprintf oc "  ()\n\n";
-       Printf.fprintf oc "let get name = Hashtbl.find_opt maps_by_name name\n")
+       Printf.fprintf oc "let get name = Hashtbl.find maps_by_name name\n";
+       Printf.fprintf oc "let to_string name = Hashtbl.find map_name_strings name\n";
+       Printf.fprintf oc "let of_string name =\n";
+       Printf.fprintf oc "  match String.lowercase_ascii name with\n";
+       List.iter
+         (fun (name, ctor) ->
+            Printf.fprintf oc "  | %S -> Some %s\n" (String.lowercase_ascii name) ctor)
+         map_entries;
+       Printf.fprintf oc "  | _ -> None\n")
 ;;
 
 let () =

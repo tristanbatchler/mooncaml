@@ -14,10 +14,18 @@ module IntMap = Map.Make (Int)
 type t =
   { clients : Client.t IntMap.t
   ; players : Entities.player IntMap.t
+  ; map : Maps.map_data
   ; next_client_id : int
   }
 
-let state = ref { clients = IntMap.empty; players = IntMap.empty; next_client_id = 0 }
+let state =
+  ref
+    { clients = IntMap.empty
+    ; players = IntMap.empty
+    ; map = Maps.get Maps.Oasis
+    ; next_client_id = 0
+    }
+;;
 
 let modify f =
   state := f !state;
@@ -61,6 +69,7 @@ let add_client ic oc =
   modify (fun st ->
     { clients = IntMap.add id client st.clients
     ; players = IntMap.add id player st.players
+    ; map = st.map
     ; next_client_id = st.next_client_id + 1
     });
   client

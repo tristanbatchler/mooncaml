@@ -4,21 +4,27 @@ open Mooncaml_shared.Terrain
 type map_data = {
   width : int;
   height : int;
-  pixels : Mooncaml_shared.Terrain.t array array;
+  terrain_map : Mooncaml_shared.Terrain.t array array;
 }
 
-let map_names : string list = [
-  "oasis";
+type map_name =
+  | Oasis
+
+let map_names : map_name list = [
+  Oasis;
 ]
 
-let maps_by_name : (string, map_data) Hashtbl.t =
+let maps_by_name : (map_name, map_data) Hashtbl.t =
+  Hashtbl.create 1
+
+let map_name_strings : (map_name, string) Hashtbl.t =
   Hashtbl.create 1
 
 let () =
-  Hashtbl.replace maps_by_name "oasis" {
+  Hashtbl.replace maps_by_name Oasis {
     width = 128;
     height = 128;
-    pixels = [|
+    terrain_map = [|
       [|OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds|];
       [|OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds|];
       [|OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds|];
@@ -149,6 +155,12 @@ let () =
       [|OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds; OutOfBounds|]
     |];
   };
+  Hashtbl.replace map_name_strings Oasis "oasis";
   ()
 
-let get name = Hashtbl.find_opt maps_by_name name
+let get name = Hashtbl.find maps_by_name name
+let to_string name = Hashtbl.find map_name_strings name
+let of_string name =
+  match String.lowercase_ascii name with
+  | "oasis" -> Some Oasis
+  | _ -> None
