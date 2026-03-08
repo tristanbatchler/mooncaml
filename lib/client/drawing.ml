@@ -43,44 +43,63 @@ let wrap_text width msg =
 let draw_terrain (state : Types.state) =
   ensure_colors ();
   let w = state.ui.map_win in
+  let win_h, win_w = Curses.getmaxyx w in
+  let view_w = win_w - 2 in
+  let view_h = win_h - 2 in
   Curses.werase w;
   Curses.box w 0 0;
-  for y = 0 to state.map.height - 1 do
-    for x = 0 to state.map.width - 1 do
-      match state.map.terrain_map.(y).(x) with
-      | OutOfBounds -> ()
-      | terrain ->
-        let pseudorandom_10 = ((x * 31) + (y * 17)) mod 10 in
-        let glyph, pair =
-          match terrain with
-          | Grass -> (if pseudorandom_10 < 7 then "," else ";"), color_pair_grass
-          | Dirt -> (if pseudorandom_10 < 5 then "." else "`"), color_pair_dirt
-          | Wall -> "#", color_pair_wall
-          | Water -> (if pseudorandom_10 < 5 then "~" else "-"), color_pair_water
-          | OutOfBounds -> assert false
-        in
-        let attr = Curses.A.color_pair pair in
-        Curses.wattron w attr;
-        ignore (Curses.mvwaddstr w (y + 1) (x + 1) glyph);
-        Curses.wattroff w attr
+  let cam_x = state.player.x - (view_w / 2) in
+  let cam_y = state.player.y - (view_h / 2) in
+  for sy = 0 to view_h - 1 do
+    for sx = 0 to view_w - 1 do
+      (* Translate screen coordinate to map coordinate *)
+      let mx = cam_x + sx in
+      let my = cam_y + sy in
+      if mx >= 0 && mx < state.map.width && my >= 0 && my < state.map.height
+      then (
+        match state.map.terrain_map.(my).(mx) with
+        | OutOfBounds -> ()
+        | terrain ->
+          let pseudorandom_10 = ((mx * 31) + (my * 17)) mod 10 in
+          let glyph, pair =
+            match terrain with
+            | Grass -> (if pseudorandom_10 < 7 then "," else ";"), color_pair_grass
+            | Dirt -> (if pseudorandom_10 < 5 then "." else "`"), color_pair_dirt
+            | Wall -> "#", color_pair_wall
+            | Water -> (if pseudorandom_10 < 5 then "~" else "-"), color_pair_water
+            | OutOfBounds -> assert false
+          in
+          let attr = Curses.A.color_pair pair in
+          Curses.wattron w attr;
+          (* Draw to the screen coordinates (+1 for border) *)
+          ignore (Curses.mvwaddstr w (sy + 1) (sx + 1) glyph);
+          Curses.wattroff w attr)
     done
   done
 ;;
 
 let draw_players (state : Types.state) =
-  (* +1 offset so game coord (0,0) maps to window coord (1,1), inside the border *)
-  let attr = Curses.A.color_pair color_pair_player in
-  Curses.wattron state.ui.map_win attr;
-  ignore
-    (Curses.mvwaddch state.ui.map_win (state.player.y + 1) (state.player.x + 1) (Char.code '@'));
-  Curses.wattroff state.ui.map_win attr;
-  let attr = Curses.A.color_pair color_pair_other_player in
-  Curses.wattron state.ui.map_win attr;
+  let w = state.ui.map_win in
+  let win_h, win_w = Curses.getmaxyx w in
+  let view_w = win_w - 2 in
+  let view_h = win_h - 2 in
+  (* Same camera calculation *)
+  let cam_x = state.player.x - (view_w / 2) in
+  let cam_y = state.player.y - (view_h / 2) in
+  let draw_entity color map_x map_y ch =
+    let sx = map_x - cam_x in
+    let sy = map_y - cam_y in
+    if sx >= 0 && sx < view_w && sy >= 0 && sy < view_h
+    then (
+      let attr = Curses.A.color_pair color in
+      Curses.wattron w attr;
+      ignore (Curses.mvwaddch w (sy + 1) (sx + 1) (Char.code ch));
+      Curses.wattroff w attr)
+  in
   Types.IntMap.iter
-    (fun _ (other : Entities.player) ->
-       ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
+    (fun _ (other : Entities.player) -> draw_entity color_pair_other_player other.x other.y 'O')
     state.other_players;
-  Curses.wattroff state.ui.map_win attr
+  draw_entity color_pair_player state.player.x state.player.y '@'
 ;;
 
 let draw_map (state : Types.state) =
