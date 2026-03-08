@@ -8,7 +8,7 @@ let handle_chat_event sender_id message state =
 ;;
 
 let handle_move_event sender_id x y state =
-  state |> Input.add_logf "Client %d moves to (%d, %d)" sender_id x y
+  state |> Input.add_logf "Client %d moved to (%d, %d)" sender_id x y
 ;;
 
 let handle_connect_event sender_id state =
@@ -107,6 +107,12 @@ let run ic oc () =
     | _ -> wait_for_welcome ()
   in
   let* player, other_players = wait_for_welcome () in
+  let others_map =
+    List.fold_left
+      (fun m (p : Entities.player) -> Types.IntMap.add p.id p m)
+      Types.IntMap.empty
+      other_players
+  in
   let initial_state =
     { ui = Windows.create_windows ()
     ; log = []
@@ -114,6 +120,7 @@ let run ic oc () =
     ; player
     ; mode = Types.World
     ; send_packets = []
+    ; other_players = others_map
     }
     |> Input.add_logf "Welcome, %s!" player.name
   in

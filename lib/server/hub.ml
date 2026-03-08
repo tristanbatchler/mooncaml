@@ -42,7 +42,7 @@ let add_client ic oc =
   let pname = Printf.sprintf "Player %d" this_client_id in
   let px = Random.int 10 in
   let py = Random.int 10 in
-  let player = Entities.{ name = pname; x = px; y = py } in
+  let player = Entities.{ id = this_client_id; name = pname; x = px; y = py } in
   let client : Client.t = { id = this_client_id; broadcast; ic; oc; player; get_other_players } in
   modify (fun st ->
     let new_clients = IntMap.add client.id client st.clients in

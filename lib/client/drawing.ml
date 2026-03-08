@@ -1,9 +1,15 @@
+open Mooncaml_shared
+
 let draw_map (state : Types.state) =
   Curses.werase state.ui.map_win;
   Curses.box state.ui.map_win 0 0;
   (* +1 offset so game coord (0,0) maps to window coord (1,1), inside the border *)
   ignore
     (Curses.mvwaddch state.ui.map_win (state.player.y + 1) (state.player.x + 1) (Char.code '@'));
+  Types.IntMap.iter
+    (fun _ (other : Entities.player) ->
+       ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
+    state.other_players;
   ignore (Curses.wrefresh state.ui.map_win)
 ;;
 

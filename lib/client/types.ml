@@ -1,4 +1,5 @@
 open Mooncaml_shared
+module IntMap = Map.Make (Int)
 
 type input_mode =
   | World
@@ -24,4 +25,5 @@ type state =
   ; player : Entities.player
   ; mode : input_mode
   ; send_packets : Packet.t list
+  ; other_players : Entities.player IntMap.t
   }
