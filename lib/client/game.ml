@@ -25,31 +25,33 @@ let handle_packet (state : Types.state) packet =
   | _ -> state
 ;;
 
-let run_todo _state oc = function
-  | Types.SendPacket packet ->
+let rec send_out_packets oc = function
+  | [] -> Lwt.return_unit
+  | packet :: rest ->
     let* () = Logs_lwt.debug (fun m -> m "Sending packet: %s" (Packet.string_of_packet packet)) in
-    Lwt_io.write_line oc (Packet.string_of_packet packet)
-  | Types.Nothing -> Lwt.return_unit
+    let* () = Lwt_io.write_line oc (Packet.string_of_packet packet) in
+    send_out_packets oc rest
 ;;
 
-let rec game_loop state todo ic oc =
+let rec game_loop state ic oc =
   let incoming = Lwt_stream.get_available server_instream in
   let state = Windows.handle_resize @@ List.fold_left handle_packet state incoming in
-  let* () = run_todo state oc todo in
+  let* () = send_out_packets oc (List.rev state.send_packets) in
+  let state = { state with send_packets = [] } in
   Drawing.draw_map state;
   Drawing.draw_log state;
   Drawing.draw_chat state;
   let ch = Curses.getch () in
-  let next_state, todo =
+  let next_state =
     if ch <> -1 && ch <> Curses.Key.resize
     then (
       match state.mode with
       | Chat -> Input.handle_chat_input state ch
       | World -> Input.handle_game_input state ch)
-    else state, Types.Nothing
+    else state
   in
   let* () = Lwt.pause () in
-  game_loop next_state todo ic oc
+  game_loop next_state ic oc
 ;;
 
 let run ic oc () =
@@ -69,9 +71,10 @@ let run ic oc () =
     ; player_x = 10
     ; player_y = 5
     ; mode = Types.World
+    ; send_packets = []
     }
     |> Input.add_log "Welcome to the roguelike UI skeleton."
   in
   Curses.timeout 50;
-  game_loop initial_state Types.Nothing ic oc
+  game_loop initial_state ic oc
 ;;

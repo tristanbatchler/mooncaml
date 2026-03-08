@@ -4,10 +4,6 @@ type input_mode =
   | World
   | Chat
 
-type todo =
-  | SendPacket of Packet.t
-  | Nothing
-
 type ui =
   { map_win : Curses.window
   ; log_win : Curses.window
@@ -28,4 +24,5 @@ type state =
   ; player_x : int
   ; player_y : int
   ; mode : input_mode
+  ; send_packets : Packet.t list
   }
