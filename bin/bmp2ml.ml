@@ -40,14 +40,16 @@ module TerrainNames = struct
   let grass = "Grass"
   let dirt = "Dirt"
   let wall = "Wall"
+  let water = "Water"
   let out_of_bounds = "OutOfBounds"
 end
 
 let terrain_of_rgb r g b =
   match r, g, b with
   | 0, 255, 0 -> TerrainNames.grass
-  | 139, 69, 19 -> TerrainNames.dirt
+  | 255, 127, 0 -> TerrainNames.dirt
   | 0, 0, 0 -> TerrainNames.wall
+  | 0, 0, 255 -> TerrainNames.water
   | 255, 0, 255 -> TerrainNames.out_of_bounds
   | _ -> TerrainNames.out_of_bounds
 ;;
@@ -96,6 +98,7 @@ let write_ml_file ~output_file filenames =
        Printf.fprintf oc "  | Grass\n";
        Printf.fprintf oc "  | Dirt\n";
        Printf.fprintf oc "  | Wall\n";
+       Printf.fprintf oc "  | Water\n";
        Printf.fprintf oc "  | OutOfBounds\n\n";
        Printf.fprintf oc "type map_data = {\n";
        Printf.fprintf oc "  name : string;\n";

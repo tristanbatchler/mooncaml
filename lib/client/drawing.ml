@@ -1,5 +1,29 @@
 open Mooncaml_shared
 
+let color_pair_player = 1
+let color_pair_other_player = 2
+let color_pair_grass = 3
+let color_pair_dirt = 4
+let color_pair_wall = 5
+let color_pair_water = 6
+let colors_ready = ref false
+
+let ensure_colors () =
+  if not !colors_ready
+  then (
+    if Curses.has_colors ()
+    then (
+      ignore (Curses.start_color ());
+      ignore (Curses.use_default_colors ());
+      ignore (Curses.init_pair color_pair_player Curses.Color.white (-1));
+      ignore (Curses.init_pair color_pair_other_player Curses.Color.magenta (-1));
+      ignore (Curses.init_pair color_pair_grass Curses.Color.green (-1));
+      ignore (Curses.init_pair color_pair_dirt Curses.Color.yellow (-1));
+      ignore (Curses.init_pair color_pair_wall Curses.Color.white (-1));
+      ignore (Curses.init_pair color_pair_water Curses.Color.blue (-1)));
+    colors_ready := true)
+;;
+
 (* Split a message into lines that fit within [width] columns *)
 let wrap_text width msg =
   let len = String.length msg in
@@ -17,31 +41,46 @@ let wrap_text width msg =
 ;;
 
 let draw_terrain (state : Types.state) =
+  ensure_colors ();
   let w = state.ui.map_win in
   Curses.werase w;
   Curses.box w 0 0;
   for y = 0 to state.map.height - 1 do
     for x = 0 to state.map.width - 1 do
-      let glyph =
-        match state.map.terrain_map.(y).(x) with
-        | Grass -> ","
-        | Dirt -> "."
-        | Wall -> "#"
-        | OutOfBounds -> " "
-      in
-      ignore (Curses.mvwaddstr w (y + 1) (x + 1) glyph)
+      match state.map.terrain_map.(y).(x) with
+      | OutOfBounds -> ()
+      | terrain ->
+        let pseudorandom_10 = ((x * 31) + (y * 17)) mod 10 in
+        let glyph, pair =
+          match terrain with
+          | Grass -> (if pseudorandom_10 < 7 then "," else ";"), color_pair_grass
+          | Dirt -> (if pseudorandom_10 < 5 then "." else "`"), color_pair_dirt
+          | Wall -> "#", color_pair_wall
+          | Water -> (if pseudorandom_10 < 5 then "~" else "-"), color_pair_water
+          | OutOfBounds -> assert false
+        in
+        let attr = Curses.A.color_pair pair in
+        Curses.wattron w attr;
+        ignore (Curses.mvwaddstr w (y + 1) (x + 1) glyph);
+        Curses.wattroff w attr
     done
   done
 ;;
 
 let draw_players (state : Types.state) =
   (* +1 offset so game coord (0,0) maps to window coord (1,1), inside the border *)
+  let attr = Curses.A.color_pair color_pair_player in
+  Curses.wattron state.ui.map_win attr;
   ignore
     (Curses.mvwaddch state.ui.map_win (state.player.y + 1) (state.player.x + 1) (Char.code '@'));
+  Curses.wattroff state.ui.map_win attr;
+  let attr = Curses.A.color_pair color_pair_other_player in
+  Curses.wattron state.ui.map_win attr;
   Types.IntMap.iter
     (fun _ (other : Entities.player) ->
        ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
-    state.other_players
+    state.other_players;
+  Curses.wattroff state.ui.map_win attr
 ;;
 
 let draw_map (state : Types.state) =
