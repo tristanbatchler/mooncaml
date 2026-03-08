@@ -25,7 +25,6 @@ type t =
       ; x : int
       ; y : int
       }
-  | ConnectEvent of { sender_id : int }
   | DisconnectEvent of { sender_id : int }
   (* From the server directly *)
   | UnexpectedServerError of string

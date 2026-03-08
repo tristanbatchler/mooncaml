@@ -57,7 +57,6 @@ let handle_packet (state : Types.state) packet =
   (* From another client (forwarded by the server) *)
   | Packet.ChatEvent { sender_id; message } -> state |> handle_chat_event sender_id message
   | Packet.MoveEvent { sender_id; x; y } -> state |> handle_move_event sender_id x y
-  | Packet.ConnectEvent { sender_id } -> state |> handle_connect_event sender_id
   | Packet.PlayerInfoEvent player_info -> state |> handle_player_info player_info
   | Packet.DisconnectEvent { sender_id } -> state |> handle_disconnect_event sender_id
   (* From the server directly *)
