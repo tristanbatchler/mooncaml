@@ -15,13 +15,16 @@ type t =
 
 let handle_say (packet : Packet.t) sender_id client =
   match packet with
-  | Packet.Say msg ->
+  | Packet.Say _ ->
     if sender_id = client.id
     then
+      (* It came from our own connection so we want to broadcast it to others *)
       let* () = client.broadcast packet client.id in
       let response = Packet.SayResponse (true, "Message broadcasted successfully") in
       Lwt_io.write_line client.oc (Packet.string_of_packet response)
-    else Lwt_io.write_line client.oc (Printf.sprintf "Client %d says: %s" sender_id msg)
+    else
+      (* It came from another client, so pass it on to our connection *)
+      Lwt_io.write_line client.oc (Packet.string_of_packet packet)
   | _ -> raise (Invalid_argument "Received non-say packet in handle_say")
 ;;
 
@@ -29,8 +32,16 @@ let handle_move (packet : Packet.t) sender_id client =
   match packet with
   | Packet.Move (x, y) ->
     if sender_id = client.id
-    then client.broadcast packet client.id
-    else Lwt_io.write_line client.oc (Printf.sprintf "Client %d moved to (%d, %d)" sender_id x y)
+    then (
+      (* It came from our own connection so we want to broadcast it to others *)
+      let success = 0 <= x && x < 10 && 0 <= y && y < 10 in
+      let* () = if success then client.broadcast packet client.id else Lwt.return_unit in
+      let msg = if success then "" else "You can't go there!" in
+      let response = Packet.MoveResponse (success, msg) in
+      Lwt_io.write_line client.oc (Packet.string_of_packet response))
+    else
+      (* It came from another client, so pass it on to our connection *)
+      Lwt_io.write_line client.oc (Packet.string_of_packet packet)
   | _ -> raise (Invalid_argument "Received non-move packet in handle_move")
 ;;
 
