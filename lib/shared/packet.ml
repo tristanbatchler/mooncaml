@@ -41,6 +41,7 @@ type t =
   | WelcomeEvent of
       { your_player : Entities.player
       ; other_players : Entities.player list
+      ; map_name : string
       }
 [@@deriving sexp]
 

@@ -115,16 +115,21 @@ let run ic oc () =
   let rec wait_for_welcome () =
     let* packet = Lwt_stream.get server_instream in
     match packet with
-    | Some (Packet.WelcomeEvent { your_player; other_players }) ->
-      Lwt.return (your_player, other_players)
+    | Some (Packet.WelcomeEvent { your_player; other_players; map_name }) ->
+      Lwt.return (your_player, other_players, map_name)
     | _ -> wait_for_welcome ()
   in
-  let* player, other_players = wait_for_welcome () in
+  let* player, other_players, map_name = wait_for_welcome () in
   let others_map =
     List.fold_left
       (fun m (p : Entities.player) -> Types.IntMap.add p.id p m)
       Types.IntMap.empty
       other_players
+  in
+  let map =
+    match Maps.map_opt_of_string map_name with
+    | Some m -> m
+    | None -> failwith ("Unknown map name received from server: " ^ map_name)
   in
   let initial_state =
     { ui = Windows.create_windows ()
@@ -134,8 +139,9 @@ let run ic oc () =
     ; mode = Types.World
     ; send_packets = []
     ; other_players = others_map
+    ; map
     }
-    |> Input.add_logf "Welcome, %s!" player.name
+    |> Input.add_logf "Welcome, %s, to %s!" player.name map.name
   in
   game_loop initial_state ic oc
 ;;
