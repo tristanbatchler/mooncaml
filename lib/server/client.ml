@@ -55,7 +55,7 @@ let handle_move_command (packet : Packet.t) sender_id client =
   | _ -> raise (Invalid_argument "Received non-move packet in handle_move_command")
 ;;
 
-let handle_connect_command (_packet : Packet.t) sender_id client =
+let handle_connect_command sender_id client =
   if sender_id = client.id
   then (
     (* Send WelcomeEvent with our player info and all other connected players *)
@@ -84,6 +84,24 @@ let handle_disconnect_command (packet : Packet.t) sender_id client =
   | _ -> raise (Invalid_argument "Received non-disconnect packet in handle_disconnect_command")
 ;;
 
+let handle_move_event (packet : Packet.t) sender_id client =
+  match packet with
+  | Packet.MoveEvent { sender_id = packet_sid; x; y } ->
+    if sender_id = client.id
+    then
+      Log_lwt.warn (fun m ->
+        m "Received MoveEvent from client %d for itself, which should not happen" sender_id)
+    else if sender_id != packet_sid
+    then
+      Log_lwt.warn (fun m ->
+        m "Received MoveEvent from client %d with mismatched sender_id %d" sender_id packet_sid)
+    else (
+      (* Coming from another client, we'll want to pass this on to our connection *)
+      let event = Packet.MoveEvent { sender_id; x; y } in
+      Packet.send client.oc event)
+  | _ -> raise (Invalid_argument "Received non-move event packet in handle_move_event")
+;;
+
 let handle_packet packet sender_id client =
   let* () =
     Log_lwt.debug (fun m ->
@@ -97,8 +115,9 @@ let handle_packet packet sender_id client =
   (* Directly from the connected user *)
   | Packet.ChatCommand _ -> handle_chat_command packet sender_id client
   | Packet.MoveCommand _ -> handle_move_command packet sender_id client
-  | Packet.ConnectCommand -> handle_connect_command packet sender_id client
+  | Packet.ConnectCommand -> handle_connect_command sender_id client
   | Packet.DisconnectCommand -> handle_disconnect_command packet sender_id client
+  | Packet.MoveEvent _ -> handle_move_event packet sender_id client
   | _ ->
     Log_lwt.warn (fun m ->
       m "Received unrecognized packet from client %d: %s" sender_id (Packet.string_of_packet packet))

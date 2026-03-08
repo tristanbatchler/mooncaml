@@ -25,8 +25,8 @@ let modify f =
 let broadcast packet sender_id =
   let clients = !state.clients in
   Lwt_list.iter_p
-    (fun (cid, client) ->
-       if cid <> sender_id then Client.handle_packet packet sender_id client else Lwt.return_unit)
+    (fun (cid, (client : Client.t)) ->
+       if cid <> sender_id then Packet.send client.oc packet else Lwt.return_unit)
     (IntMap.bindings clients)
 ;;
 
