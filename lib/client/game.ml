@@ -36,12 +36,8 @@ let handle_chat_command_response success msg state =
   if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
 ;;
 
-let handle_move_command_response success msg x y (state : Types.state) =
-  if success
-  then state
-  else (
-    let state = { state with player = { state.player with x; y } } in
-    state |> Input.add_log ("Failed to move: " ^ msg))
+let handle_move_command_response success _ x y (state : Types.state) =
+  if success then state else { state with player = { state.player with x; y } }
 ;;
 
 let handle_disconnect_command_response success msg state =

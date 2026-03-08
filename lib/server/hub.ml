@@ -45,14 +45,23 @@ let broadcast packet sender_id =
 let starting_map = Maps.get Maps.Oasis
 
 let try_move client_id x y =
-  (* TODO: add real validation (bounds, collisions) here *)
-  let st = !state in
-  match IntMap.find_opt client_id st.players with
-  | None -> false
-  | Some player ->
-    let player' = Entities.{ player with x; y } in
-    modify (fun st -> { st with players = IntMap.add client_id player' st.players });
-    true
+  let client = IntMap.find client_id !state.clients in
+  let terrain = client.map.terrain_map.(y).(x) in
+  let can_move =
+    match terrain with
+    | Maps.Grass | Maps.Dirt -> true
+    | _ -> false
+  in
+  if not can_move
+  then false
+  else (
+    let st = !state in
+    match IntMap.find_opt client_id st.players with
+    | None -> false
+    | Some player ->
+      let player' = Entities.{ player with x; y } in
+      modify (fun st -> { st with players = IntMap.add client_id player' st.players });
+      true)
 ;;
 
 let get_all_players () = IntMap.bindings !state.players |> List.map snd
@@ -62,14 +71,18 @@ let get_player client_id () = IntMap.find client_id !state.players
 
 let add_client ic oc =
   let id = !state.next_client_id in
-  let player =
-    Entities.
-      { id
-      ; name = Printf.sprintf "Player %d" id
-      ; x = Random.int starting_map.width
-      ; y = Random.int starting_map.height
-      }
+  let rec spawn_point () =
+    let x = Random.int starting_map.width in
+    let y = Random.int starting_map.height in
+    let terrain = starting_map.terrain_map.(y).(x) in
+    match terrain with
+    | Maps.Grass | Maps.Dirt -> x, y
+    | _ ->
+      Log.debug (fun m -> m "Spawn point at (%d, %d) was not suitable for player, retrying..." x y);
+      spawn_point ()
   in
+  let x, y = spawn_point () in
+  let player = Entities.{ id; name = Printf.sprintf "Player %d" id; x; y } in
   let client : Client.t =
     { id
     ; broadcast
