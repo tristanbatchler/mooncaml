@@ -1,3 +1,15 @@
+(rule
+ (mode promote)
+ (targets maps.ml)
+ (deps
+	%{bin:bmp2ml}
+	(glob_files %{workspace_root}/data/maps/*.bmp))
+ (action
+	(run
+	 %{bin:bmp2ml}
+	 --input-dir %{workspace_root}/data/maps
+	 --output-file maps.ml)))
+
 (library
  (name mooncaml_server)
- (libraries mooncaml_shared mooncaml_server_maps sexplib lwt lwt.unix))
+ (libraries mooncaml_shared sexplib lwt lwt.unix))
