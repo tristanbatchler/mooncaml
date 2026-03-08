@@ -2,26 +2,46 @@ open Lwt.Syntax
 open Mooncaml_shared
 
 let server_instream, server_outstream = Lwt_stream.create ()
-let handle_say state msg = state |> Input.add_log ("Someone said: " ^ msg)
 
-let handle_say_response state success msg =
-  if success then state else state |> Input.add_log ("Failed to say: " ^ msg)
+let handle_says_other state sender_id msg =
+  Input.add_log (Printf.sprintf "Client %d says: %s" sender_id msg) state
 ;;
 
-let handle_move_response state success msg =
+let handle_move_other state sender_id x y =
+  Input.add_log (Printf.sprintf "Client %d moves to (%d, %d)" sender_id x y) state
+;;
+
+let handle_disconnect_other state sender_id =
+  Input.add_log (Printf.sprintf "Client %d has disconnected" sender_id) state
+;;
+
+(* ----- From the server directly -------------------------- *)
+
+let handle_unexpected_server_error state msg = Input.add_log ("Server error: " ^ msg) state
+
+let handle_says_me_response state success msg =
+  if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
+;;
+
+let handle_move_me_response state success msg =
   if success then state else state |> Input.add_log ("Failed to move: " ^ msg)
 ;;
 
-let handle_disconnect state = state |> Input.add_log "Disconnected from server."
-let handle_server_error state msg = state |> Input.add_log ("Server error: " ^ msg)
+let handle_disconnect_me_response state success msg =
+  if success then state else state |> Input.add_log ("Failed to disconnect: " ^ msg)
+;;
 
 let handle_packet (state : Types.state) packet =
   match packet with
-  | Packet.Say msg -> handle_say state msg
-  | Packet.SayResponse (success, msg) -> handle_say_response state success msg
-  | Packet.MoveResponse (success, msg) -> handle_move_response state success msg
-  | Packet.Disconnect -> handle_disconnect state
-  | Packet.ServerError msg -> handle_server_error state msg
+  (* From another client (forwarded by the server) *)
+  | Packet.SaysOther (sender_id, msg) -> handle_says_other state sender_id msg
+  | Packet.MoveOther (sender_id, x, y) -> handle_move_other state sender_id x y
+  | Packet.DisconnectOther sender_id -> handle_disconnect_other state sender_id
+  (* From the server directly *)
+  | Packet.UnexpectedServerError msg -> handle_unexpected_server_error state msg
+  | Packet.SaysMeResponse (success, msg) -> handle_says_me_response state success msg
+  | Packet.MoveMeResponse (success, msg) -> handle_move_me_response state success msg
+  | Packet.DisconnectMeResponse (success, msg) -> handle_disconnect_me_response state success msg
   | _ -> state
 ;;
 

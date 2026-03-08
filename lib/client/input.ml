@@ -11,7 +11,7 @@ let handle_game_input (state : Types.state) ch =
     { state with
       player_x = x
     ; player_y = y
-    ; send_packets = Packet.Move (x, y) :: state.send_packets
+    ; send_packets = Packet.MoveMe (x, y) :: state.send_packets
     }
   in
   match ch with
@@ -33,7 +33,7 @@ let handle_chat_input (state : Types.state) ch =
       if String.length ed.text > 0
       then
         { (add_log ("You said: " ^ ed.text) state) with
-          send_packets = Packet.Say ed.text :: state.send_packets
+          send_packets = Packet.SaysMe ed.text :: state.send_packets
         }
       else state
     in
