@@ -2,31 +2,36 @@ open Lwt.Syntax
 open Mooncaml_shared
 
 let server_instream, server_outstream = Lwt_stream.create ()
-let handle_says_other sender_id msg state = Input.add_logf "Client %d says: %s" state sender_id msg
 
-let handle_move_other sender_id x y state =
-  Input.add_logf "Client %d moves to (%d, %d)" state sender_id x y
+let handle_says_other sender_id msg state =
+  state |> Input.add_logf "Client %d says: %s" sender_id msg
 ;;
 
-let handle_connect_other sender_id state = Input.add_logf "Client %d has connected" state sender_id
+let handle_move_other sender_id x y state =
+  state |> Input.add_logf "Client %d moves to (%d, %d)" sender_id x y
+;;
 
-let handle_about_other sender_id (player_info : Packet.player_info) state =
-  Input.add_logf
-    "Client %d is named %s and is at (%d, %d)"
-    state
-    sender_id
-    player_info.name
-    player_info.x
-    player_info.y
+let handle_connect_other sender_id state =
+  state |> Input.add_logf "Client %d has connected" sender_id
+;;
+
+let handle_about_other sender_id (player_info : Entities.player) state =
+  state
+  |> Input.add_logf
+       "Client %d is named %s and is at (%d, %d)"
+       sender_id
+       player_info.name
+       player_info.x
+       player_info.y
 ;;
 
 let handle_disconnect_other sender_id state =
-  Input.add_logf "Client %d has disconnected" state sender_id
+  state |> Input.add_logf "Client %d has disconnected" sender_id
 ;;
 
 (* ----- From the server directly -------------------------- *)
 
-let handle_unexpected_server_error msg state = Input.add_log ("Server error: " ^ msg) state
+let handle_unexpected_server_error msg state = state |> Input.add_log ("Server error: " ^ msg)
 
 let handle_says_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
@@ -38,6 +43,10 @@ let handle_move_me_response success msg state =
 
 let handle_connect_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to connect: " ^ msg)
+;;
+
+let handle_about_me (player : Entities.player) (state : Types.state) =
+  { state with player } |> Input.add_logf "Welcome, %s!" player.name
 ;;
 
 let handle_disconnect_me_response success msg state =
@@ -57,8 +66,11 @@ let handle_packet (state : Types.state) packet =
   | Packet.SaysMeResponse (success, msg) -> state |> handle_says_me_response success msg
   | Packet.MoveMeResponse (success, msg) -> state |> handle_move_me_response success msg
   | Packet.ConnectMeResponse (success, msg) -> state |> handle_connect_me_response success msg
+  | Packet.AboutMe player -> state |> handle_about_me player
   | Packet.DisconnectMeResponse (success, msg) -> state |> handle_disconnect_me_response success msg
-  | _ -> state
+  | _ ->
+    Logs.warn (fun m -> m "Received unexpected packet: %s" (Packet.string_of_packet packet));
+    state
 ;;
 
 let rec send_out_packets oc = function
@@ -99,18 +111,25 @@ let run ic oc () =
   ignore (Curses.keypad (Curses.stdscr ()) true);
   ignore (Curses.curs_set 0);
   Curses.winch_handler_on ();
+  Curses.timeout 50;
+  let* () = Packet.send oc Packet.ConnectMe in
+  (* At this point we expect the server to respond with an `AboutMe` packet *)
+  let rec wait_for_about_me () =
+    let* packet = Lwt_stream.get server_instream in
+    match packet with
+    | Some (Packet.AboutMe player) -> Lwt.return player
+    | _ -> wait_for_about_me ()
+  in
+  let* player = wait_for_about_me () in
   let initial_state =
     { ui = Windows.create_windows ()
     ; log = []
     ; chat = Textbox.empty_edit
-    ; player_x = 10
-    ; player_y = 5
+    ; player
     ; mode = Types.World
     ; send_packets = []
     }
     |> Input.add_log "Welcome to the horrifying world of Mooncaml *caml noises*."
   in
-  Curses.timeout 50;
-  let* () = Packet.send oc Packet.ConnectMe in
   game_loop initial_state ic oc
 ;;

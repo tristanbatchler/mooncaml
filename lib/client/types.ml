@@ -21,8 +21,7 @@ type state =
   { ui : ui
   ; log : string list
   ; chat : edit_line
-  ; player_x : int
-  ; player_y : int
+  ; player : Entities.player
   ; mode : input_mode
   ; send_packets : Packet.t list
   }

@@ -12,6 +12,7 @@ type t =
   ; pass_to_other_client : int -> Packet.t -> unit Lwt.t
   ; ic : Lwt_io.input_channel
   ; oc : Lwt_io.output_channel
+  ; player : Entities.player
   }
 
 let handle_says_me (packet : Packet.t) sender_id client =
@@ -53,16 +54,17 @@ let handle_connect_me (packet : Packet.t) sender_id client =
   | Packet.ConnectMe ->
     if sender_id = client.id
     then
-      (* It came from our own connection so we want to broadcast it to others *)
+      (* It came from our own connection so we want to broadcast it to others and send the client our own info *)
       let* () = client.broadcast packet client.id in
       let response = Packet.ConnectMeResponse (true, "Connected successfully") in
-      Packet.send client.oc response
+      let* () = Packet.send client.oc response in
+      let about_me_packet = Packet.AboutMe client.player in
+      Packet.send client.oc about_me_packet
     else (
       (* It came from another client, so pass it on to our connection and tell the new guy about us *)
       let connect_other_packet = Packet.ConnectOther sender_id in
       let* () = Packet.send client.oc connect_other_packet in
-      let my_player_info = Packet.{ name = Printf.sprintf "Player%d" client.id; x = 0; y = 0 } in
-      let about_me_packet = Packet.AboutOther (client.id, my_player_info) in
+      let about_me_packet = Packet.AboutOther (client.id, client.player) in
       client.pass_to_other_client sender_id about_me_packet)
   | _ -> raise (Invalid_argument "Received non-connect packet in handle_connect_me")
 ;;

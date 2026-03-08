@@ -2,24 +2,24 @@ open Mooncaml_shared
 
 let max_log = 256
 let add_log msg (state : Types.state) = { state with log = Util.take max_log (msg :: state.log) }
-let add_logf fmt state = Printf.ksprintf (fun msg -> add_log msg state) fmt
+let add_logf fmt = Printf.ksprintf (fun msg state -> add_log msg state) fmt
 let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
 
+let move_player dx dy (state : Types.state) =
+  let x = state.player.x + dx in
+  let y = state.player.y + dy in
+  { state with
+    player = { state.player with x; y }
+  ; send_packets = Packet.MoveMe (x, y) :: state.send_packets
+  }
+;;
+
 let handle_game_input (state : Types.state) ch =
-  let move dx dy =
-    let x = state.player_x + dx in
-    let y = state.player_y + dy in
-    { state with
-      player_x = x
-    ; player_y = y
-    ; send_packets = Packet.MoveMe (x, y) :: state.send_packets
-    }
-  in
   match ch with
-  | c when c = Curses.Key.up -> move 0 (-1)
-  | c when c = Curses.Key.down -> move 0 1
-  | c when c = Curses.Key.left -> move (-1) 0
-  | c when c = Curses.Key.right -> move 1 0
+  | c when c = Curses.Key.up -> state |> move_player 0 (-1)
+  | c when c = Curses.Key.down -> state |> move_player 0 1
+  | c when c = Curses.Key.left -> state |> move_player (-1) 0
+  | c when c = Curses.Key.right -> state |> move_player 1 0
   | c when c = Curses.Key.enter || c = Char.code '\n' ->
     { state with mode = Chat; chat = Textbox.empty_edit }
   | _ -> state

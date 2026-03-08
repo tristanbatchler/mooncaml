@@ -43,8 +43,18 @@ let add_client ic oc =
   let this_clients_pass_to_other_fn =
     fun to_client_id packet -> pass_to_other_client this_client_id to_client_id packet
   in
+  let pname = Printf.sprintf "Player %d" this_client_id in
+  let px = Random.int 10 in
+  let py = Random.int 10 in
+  let player = Entities.{ name = pname; x = px; y = py } in
   let client : Client.t =
-    { id = this_client_id; broadcast; pass_to_other_client = this_clients_pass_to_other_fn; ic; oc }
+    { id = this_client_id
+    ; broadcast
+    ; pass_to_other_client = this_clients_pass_to_other_fn
+    ; ic
+    ; oc
+    ; player
+    }
   in
   modify (fun st ->
     let new_clients = IntMap.add client.id client st.clients in
