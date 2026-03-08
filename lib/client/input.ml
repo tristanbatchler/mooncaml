@@ -39,7 +39,7 @@ let handle_chat_input (state : Types.state) ch =
   | c when c = Curses.Key.enter || c = Char.code '\n' ->
     let state, todo =
       if String.length ed.text > 0
-      then add_log ed.text state, Types.SendPacket (Packet.Say ed.text)
+      then add_log ("You said: " ^ ed.text) state, Types.SendPacket (Packet.Say ed.text)
       else state, Types.Nothing
     in
     { state with mode = Types.World; chat = Textbox.empty_edit }, todo

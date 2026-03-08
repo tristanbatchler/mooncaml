@@ -5,12 +5,8 @@ let server_instream, server_outstream = Lwt_stream.create ()
 let handle_say state msg = state |> Input.add_log ("Someone said: " ^ msg)
 
 let handle_say_response state success msg =
-  if success
-  then state |> Input.add_log ("You said: " ^ msg)
-  else state |> Input.add_log ("Failed to say: " ^ msg)
+  if success then state else state |> Input.add_log ("Failed to say: " ^ msg)
 ;;
-
-let handle_move state (x, y) = Types.{ state with player_x = x; player_y = y }
 
 let handle_move_response state success msg =
   if success then state else state |> Input.add_log ("Failed to move: " ^ msg)
@@ -23,10 +19,10 @@ let handle_packet (state : Types.state) packet =
   match packet with
   | Packet.Say msg -> handle_say state msg
   | Packet.SayResponse (success, msg) -> handle_say_response state success msg
-  | Packet.Move (x, y) -> handle_move state (x, y)
   | Packet.MoveResponse (success, msg) -> handle_move_response state success msg
   | Packet.Disconnect -> handle_disconnect state
   | Packet.ServerError msg -> handle_server_error state msg
+  | _ -> state
 ;;
 
 let run_todo _state oc = function

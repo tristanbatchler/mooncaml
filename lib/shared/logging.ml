@@ -8,7 +8,7 @@ let tag_client_id : int Logs.Tag.def =
 
 let tag_with_client id = Logs.Tag.(empty |> add tag_client_id id)
 
-let custom_reporter () =
+let custom_reporter ?(destination = Format.std_formatter) () =
   let report src level ~over k msgf =
     let k _ =
       over ();
@@ -33,7 +33,7 @@ let custom_reporter () =
         src_name
         client_prefix
     in
-    msgf @@ fun ?header ?tags fmt -> print_log header tags k Format.std_formatter fmt
+    msgf @@ fun ?header ?tags fmt -> print_log header tags k destination fmt
   in
   { Logs.report }
 ;;
