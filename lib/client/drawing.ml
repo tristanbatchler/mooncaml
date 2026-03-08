@@ -1,18 +1,5 @@
 open Mooncaml_shared
 
-let draw_map (state : Types.state) =
-  Curses.werase state.ui.map_win;
-  Curses.box state.ui.map_win 0 0;
-  (* +1 offset so game coord (0,0) maps to window coord (1,1), inside the border *)
-  ignore
-    (Curses.mvwaddch state.ui.map_win (state.player.y + 1) (state.player.x + 1) (Char.code '@'));
-  Types.IntMap.iter
-    (fun _ (other : Entities.player) ->
-       ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
-    state.other_players;
-  ignore (Curses.wrefresh state.ui.map_win)
-;;
-
 (* Split a message into lines that fit within [width] columns *)
 let wrap_text width msg =
   let len = String.length msg in
@@ -27,6 +14,43 @@ let wrap_text width msg =
         go (String.sub msg pos chunk_len :: acc) (pos + chunk_len))
     in
     go [] 0)
+;;
+
+let draw_terrain (state : Types.state) =
+  let w = state.ui.map_win in
+  Curses.werase w;
+  Curses.box w 0 0;
+  for y = 0 to state.map.height - 1 do
+    for x = 0 to state.map.width - 1 do
+      let glyph =
+        match state.map.terrain_map.(y).(x) with
+        | Maps.Grass -> ","
+        | Dirt -> "."
+        | Wall -> "#"
+        | OutOfBounds -> " "
+      in
+      ignore (Curses.mvwaddstr w (y + 1) (x + 1) glyph)
+    done
+  done;
+  ignore (Curses.wrefresh w)
+;;
+
+let draw_players (state : Types.state) =
+  (* +1 offset so game coord (0,0) maps to window coord (1,1), inside the border *)
+  ignore
+    (Curses.mvwaddch state.ui.map_win (state.player.y + 1) (state.player.x + 1) (Char.code '@'));
+  Types.IntMap.iter
+    (fun _ (other : Entities.player) ->
+       ignore (Curses.mvwaddch state.ui.map_win (other.y + 1) (other.x + 1) (Char.code 'O')))
+    state.other_players;
+  ignore (Curses.wrefresh state.ui.map_win)
+;;
+
+let draw_map (state : Types.state) =
+  Curses.werase state.ui.map_win;
+  Curses.box state.ui.map_win 0 0;
+  draw_terrain state;
+  draw_players state
 ;;
 
 let draw_log (state : Types.state) =

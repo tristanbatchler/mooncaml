@@ -42,6 +42,8 @@ let broadcast packet sender_id =
 
 (* ── Game-logic  ────────────────────────────────────────────── *)
 
+let starting_map = Maps.get Maps.Oasis
+
 let try_move client_id x y =
   (* TODO: add real validation (bounds, collisions) here *)
   let st = !state in
@@ -61,10 +63,23 @@ let get_player client_id () = IntMap.find client_id !state.players
 let add_client ic oc =
   let id = !state.next_client_id in
   let player =
-    Entities.{ id; name = Printf.sprintf "Player %d" id; x = Random.int 10; y = Random.int 10 }
+    Entities.
+      { id
+      ; name = Printf.sprintf "Player %d" id
+      ; x = Random.int starting_map.width
+      ; y = Random.int starting_map.height
+      }
   in
   let client : Client.t =
-    { id; broadcast; ic; oc; try_move = try_move id; get_all_players; get_player = get_player id }
+    { id
+    ; broadcast
+    ; ic
+    ; oc
+    ; try_move = try_move id
+    ; get_all_players
+    ; get_player = get_player id
+    ; map = starting_map
+    }
   in
   modify (fun st ->
     { clients = IntMap.add id client st.clients

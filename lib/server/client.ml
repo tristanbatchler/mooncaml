@@ -14,9 +14,8 @@ type t =
   ; try_move : int -> int -> bool
   ; get_all_players : unit -> Entities.player list
   ; get_player : unit -> Entities.player
+  ; map : Maps.map_data
   }
-
-let starting_map_name = Maps.Oasis
 
 let handle_chat_command (packet : Packet.t) client =
   match packet with
@@ -59,10 +58,7 @@ let handle_connect_command client =
     | [ p ] -> p
     | _ -> failwith "Could not find own player in world state"
   in
-  let welcome =
-    Packet.WelcomeEvent
-      { your_player; other_players; map_name = Maps.string_of_map_name starting_map_name }
-  in
+  let welcome = Packet.WelcomeEvent { your_player; other_players; map_name = client.map.name } in
   let* () = Packet.send client.oc welcome in
   (* Broadcast our existence to others *)
   client.broadcast (Packet.PlayerInfoEvent your_player) client.id
