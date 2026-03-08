@@ -40,15 +40,12 @@ let handle_chat_command_response success msg state =
   if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
 ;;
 
-let handle_move_command_response success msg (state : Types.state) =
-  (* There are issues with this - one being moving feels ever so slighly delayed, 
-     another being that this response might be for a previous move command, which 
-     would snap the player back to a previous location unexpectedly *)
+let handle_move_command_response success msg x y (state : Types.state) =
   if success
-  then (
-    let x, y = state.desired_location in
-    { state with player = { state.player with x; y } })
-  else state |> Input.add_log ("Failed to move: " ^ msg)
+  then state
+  else (
+    let state = { state with player = { state.player with x; y } } in
+    state |> Input.add_log ("Failed to move: " ^ msg))
 ;;
 
 let handle_disconnect_command_response success msg state =
@@ -66,7 +63,8 @@ let handle_packet (state : Types.state) packet =
   (* From the server directly *)
   | Packet.UnexpectedServerError msg -> state |> handle_unexpected_server_error msg
   | Packet.ChatCommandResponse (success, msg) -> state |> handle_chat_command_response success msg
-  | Packet.MoveCommandResponse (success, msg) -> state |> handle_move_command_response success msg
+  | Packet.MoveCommandResponse { success; msg; x; y } ->
+    state |> handle_move_command_response success msg x y
   | Packet.DisconnectCommandResponse (success, msg) ->
     state |> handle_disconnect_command_response success msg
   | _ ->
@@ -137,7 +135,6 @@ let run ic oc () =
     ; mode = Types.World
     ; send_packets = []
     ; other_players = others_map
-    ; desired_location = player.x, player.y
     }
     |> Input.add_logf "Welcome, %s!" player.name
   in

@@ -13,6 +13,7 @@ type t =
   ; oc : Lwt_io.output_channel (* Server Logic Hooks *)
   ; try_move : int -> int -> bool
   ; get_all_players : unit -> Entities.player list
+  ; get_player : unit -> Entities.player
   }
 
 let handle_chat_command (packet : Packet.t) client =
@@ -35,8 +36,13 @@ let handle_move_command (packet : Packet.t) client =
       then client.broadcast (Packet.MoveEvent { sender_id = client.id; x; y }) client.id
       else Lwt.return_unit
     in
-    let msg = if success then "" else "You can't go there!" in
-    Packet.send client.oc (Packet.MoveCommandResponse (success, msg))
+    (* Fetch the ABSOLUTE TRUTH from the Hub *)
+    let actual_player = client.get_player () in
+    let msg = if success then "" else "You bumped into a wall!" in
+    let response =
+      Packet.MoveCommandResponse { success; msg; x = actual_player.x; y = actual_player.y }
+    in
+    Packet.send client.oc response
   | _ -> raise (Invalid_argument "Received non-move packet in handle_move_command")
 ;;
 

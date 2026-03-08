@@ -30,7 +30,12 @@ type t =
   (* From the server directly *)
   | UnexpectedServerError of string
   | ChatCommandResponse of response
-  | MoveCommandResponse of response
+  | MoveCommandResponse of
+      { success : bool
+      ; msg : string
+      ; x : int
+      ; y : int
+      }
   | ConnectCommandResponse of response
   | DisconnectCommandResponse of response
   | PlayerInfoEvent of Entities.player

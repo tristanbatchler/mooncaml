@@ -46,6 +46,7 @@ let try_move client_id x y =
 ;;
 
 let get_all_players () = IntMap.bindings !state.players |> List.map snd
+let get_player client_id () = IntMap.find client_id !state.players
 
 (* ── Client lifecycle ────────────────────────────────────────── *)
 
@@ -54,7 +55,9 @@ let add_client ic oc =
   let player =
     Entities.{ id; name = Printf.sprintf "Player %d" id; x = Random.int 10; y = Random.int 10 }
   in
-  let client : Client.t = { id; broadcast; ic; oc; try_move = try_move id; get_all_players } in
+  let client : Client.t =
+    { id; broadcast; ic; oc; try_move = try_move id; get_all_players; get_player = get_player id }
+  in
   modify (fun st ->
     { clients = IntMap.add id client st.clients
     ; players = IntMap.add id player st.players
