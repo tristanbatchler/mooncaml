@@ -17,6 +17,13 @@ git ls-files | grep -E "$regex" | while IFS= read -r file; do
         continue
     fi
 
+    # Omit requested files and directories
+    case "$file" in
+        .vscode/*|test/*|README.md|LICENSE|dune-project|.gitignore|.ocamlformat|server/maps/*.ml|*/server/maps/*.ml|lib/server/maps/*.ml)
+            continue
+            ;;
+    esac
+
     # Extract lowercase extension
     ext=".${file##*.}"
     ext="${ext,,}"

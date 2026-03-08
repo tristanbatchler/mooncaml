@@ -1,6 +1,7 @@
 (library
  (name mooncaml_server_maps)
- (modules oasis))
+ (modules oasis)
+ (libraries mooncaml_shared))
 
 (rule
  (mode promote)
