@@ -1,4 +1,4 @@
 (library
  (name mooncaml_client)
  (libraries mooncaml_shared lwt lwt.unix logs logs.lwt logs.fmt fmt.tty curses)
- (modules types windows textbox drawing input game net_client))
+ (modules types windows textbox drawing input game net_client util))
