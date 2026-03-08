@@ -1,5 +1,5 @@
 (library
  (name mooncaml_shared)
- (libraries sexplib logs logs.lwt logs.fmt fmt.tty)
+ (libraries sexplib logs logs.lwt logs.fmt fmt.tty lwt lwt.unix)
  (preprocess
   (pps ppx_sexp_conv)))

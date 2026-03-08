@@ -2,6 +2,7 @@ open Mooncaml_shared
 
 let max_log = 256
 let add_log msg (state : Types.state) = { state with log = Util.take max_log (msg :: state.log) }
+let add_logf fmt state = Printf.ksprintf (fun msg -> add_log msg state) fmt
 let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
 
 let handle_game_input (state : Types.state) ch =

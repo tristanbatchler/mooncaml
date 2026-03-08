@@ -21,11 +21,11 @@ let handle_says_me (packet : Packet.t) sender_id client =
       (* It came from our own connection so we want to broadcast it to others *)
       let* () = client.broadcast packet client.id in
       let response = Packet.SaysMeResponse (true, "Message broadcasted successfully") in
-      Lwt_io.write_line client.oc (Packet.string_of_packet response)
+      Packet.send client.oc response
     else (
       (* It came from another client, so pass it on to our connection *)
       let says_other_packet = Packet.SaysOther (sender_id, msg) in
-      Lwt_io.write_line client.oc (Packet.string_of_packet says_other_packet))
+      Packet.send client.oc says_other_packet)
   | _ -> raise (Invalid_argument "Received non-say packet in handle_says_me")
 ;;
 
@@ -39,12 +39,28 @@ let handle_move_me (packet : Packet.t) sender_id client =
       let* () = if success then client.broadcast packet client.id else Lwt.return_unit in
       let msg = if success then "" else "You can't go there!" in
       let response = Packet.MoveMeResponse (success, msg) in
-      Lwt_io.write_line client.oc (Packet.string_of_packet response))
+      Packet.send client.oc response)
     else (
       (* It came from another client, so pass it on to our connection *)
       let move_other_packet = Packet.MoveOther (sender_id, x, y) in
-      Lwt_io.write_line client.oc (Packet.string_of_packet move_other_packet))
+      Packet.send client.oc move_other_packet)
   | _ -> raise (Invalid_argument "Received non-move packet in handle_move_me")
+;;
+
+let handle_connect_me (packet : Packet.t) sender_id client =
+  match packet with
+  | Packet.ConnectMe ->
+    if sender_id = client.id
+    then
+      (* It came from our own connection so we want to broadcast it to others *)
+      let* () = client.broadcast packet client.id in
+      let response = Packet.ConnectMeResponse (true, "Connected successfully") in
+      Packet.send client.oc response
+    else (
+      (* It came from another client, so pass it on to our connection *)
+      let connect_other_packet = Packet.ConnectOther sender_id in
+      Packet.send client.oc connect_other_packet)
+  | _ -> raise (Invalid_argument "Received non-connect packet in handle_connect_me")
 ;;
 
 let handle_disconnect_me (packet : Packet.t) sender_id client =
@@ -57,7 +73,7 @@ let handle_disconnect_me (packet : Packet.t) sender_id client =
     else (
       (* It came from another client, so pass it on to our connection *)
       let disconnect_other_packet = Packet.DisconnectOther sender_id in
-      Lwt_io.write_line client.oc (Packet.string_of_packet disconnect_other_packet))
+      Packet.send client.oc disconnect_other_packet)
   | _ -> raise (Invalid_argument "Received non-disconnect packet in handle_disconnect_me")
 ;;
 
@@ -73,6 +89,7 @@ let handle_packet packet sender_id client =
   match packet with
   | Packet.SaysMe _ -> handle_says_me packet sender_id client
   | Packet.MoveMe _ -> handle_move_me packet sender_id client
+  | Packet.ConnectMe -> handle_connect_me packet sender_id client
   | Packet.DisconnectMe -> handle_disconnect_me packet sender_id client
   | _ ->
     Log_lwt.warn (fun m ->

@@ -2,54 +2,53 @@ open Lwt.Syntax
 open Mooncaml_shared
 
 let server_instream, server_outstream = Lwt_stream.create ()
+let handle_says_other sender_id msg state = Input.add_logf "Client %d says: %s" state sender_id msg
 
-let handle_says_other state sender_id msg =
-  Input.add_log (Printf.sprintf "Client %d says: %s" sender_id msg) state
+let handle_move_other sender_id x y state =
+  Input.add_logf "Client %d moves to (%d, %d)" state sender_id x y
 ;;
 
-let handle_move_other state sender_id x y =
-  Input.add_log (Printf.sprintf "Client %d moves to (%d, %d)" sender_id x y) state
-;;
+let handle_connect_other sender_id state = Input.add_logf "Client %d has connected" state sender_id
 
-let handle_disconnect_other state sender_id =
-  Input.add_log (Printf.sprintf "Client %d has disconnected" sender_id) state
+let handle_disconnect_other sender_id state =
+  Input.add_logf "Client %d has disconnected" state sender_id
 ;;
 
 (* ----- From the server directly -------------------------- *)
 
-let handle_unexpected_server_error state msg = Input.add_log ("Server error: " ^ msg) state
+let handle_unexpected_server_error msg state = Input.add_log ("Server error: " ^ msg) state
 
-let handle_says_me_response state success msg =
+let handle_says_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to send message: " ^ msg)
 ;;
 
-let handle_move_me_response state success msg =
+let handle_move_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to move: " ^ msg)
 ;;
 
-let handle_disconnect_me_response state success msg =
+let handle_disconnect_me_response success msg state =
   if success then state else state |> Input.add_log ("Failed to disconnect: " ^ msg)
 ;;
 
 let handle_packet (state : Types.state) packet =
   match packet with
   (* From another client (forwarded by the server) *)
-  | Packet.SaysOther (sender_id, msg) -> handle_says_other state sender_id msg
-  | Packet.MoveOther (sender_id, x, y) -> handle_move_other state sender_id x y
-  | Packet.DisconnectOther sender_id -> handle_disconnect_other state sender_id
+  | Packet.SaysOther (sender_id, msg) -> state |> handle_says_other sender_id msg
+  | Packet.MoveOther (sender_id, x, y) -> state |> handle_move_other sender_id x y
+  | Packet.ConnectOther sender_id -> state |> handle_connect_other sender_id
+  | Packet.DisconnectOther sender_id -> state |> handle_disconnect_other sender_id
   (* From the server directly *)
-  | Packet.UnexpectedServerError msg -> handle_unexpected_server_error state msg
-  | Packet.SaysMeResponse (success, msg) -> handle_says_me_response state success msg
-  | Packet.MoveMeResponse (success, msg) -> handle_move_me_response state success msg
-  | Packet.DisconnectMeResponse (success, msg) -> handle_disconnect_me_response state success msg
+  | Packet.UnexpectedServerError msg -> state |> handle_unexpected_server_error msg
+  | Packet.SaysMeResponse (success, msg) -> state |> handle_says_me_response success msg
+  | Packet.MoveMeResponse (success, msg) -> state |> handle_move_me_response success msg
+  | Packet.DisconnectMeResponse (success, msg) -> state |> handle_disconnect_me_response success msg
   | _ -> state
 ;;
 
 let rec send_out_packets oc = function
   | [] -> Lwt.return_unit
   | packet :: rest ->
-    let* () = Logs_lwt.debug (fun m -> m "Sending packet: %s" (Packet.string_of_packet packet)) in
-    let* () = Lwt_io.write_line oc (Packet.string_of_packet packet) in
+    let* () = Packet.send oc packet in
     send_out_packets oc rest
 ;;
 
@@ -93,8 +92,9 @@ let run ic oc () =
     ; mode = Types.World
     ; send_packets = []
     }
-    |> Input.add_log "Welcome to the roguelike UI skeleton."
+    |> Input.add_log "Welcome to the horrifying world of Mooncaml *caml noises*."
   in
   Curses.timeout 50;
+  let* () = Packet.send oc Packet.ConnectMe in
   game_loop initial_state ic oc
 ;;
