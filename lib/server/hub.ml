@@ -30,32 +30,20 @@ let broadcast packet sender_id =
     (IntMap.bindings clients)
 ;;
 
-let pass_to_other_client from_client_id to_client_id packet =
-  match IntMap.find_opt to_client_id !state.clients with
-  | Some client -> Client.handle_packet packet from_client_id client
-  | None ->
-    Log.err (fun m -> m "Failed to pass packet to client %d: client not found" to_client_id);
-    Lwt.return_unit
+let get_other_players exclude_id =
+  let clients = !state.clients in
+  IntMap.bindings clients
+  |> List.filter_map (fun (cid, (client : Client.t)) ->
+    if cid <> exclude_id then Some client.player else None)
 ;;
 
 let add_client ic oc =
   let this_client_id = !state.next_client_id in
-  let this_clients_pass_to_other_fn =
-    fun to_client_id packet -> pass_to_other_client this_client_id to_client_id packet
-  in
   let pname = Printf.sprintf "Player %d" this_client_id in
   let px = Random.int 10 in
   let py = Random.int 10 in
   let player = Entities.{ name = pname; x = px; y = py } in
-  let client : Client.t =
-    { id = this_client_id
-    ; broadcast
-    ; pass_to_other_client = this_clients_pass_to_other_fn
-    ; ic
-    ; oc
-    ; player
-    }
-  in
+  let client : Client.t = { id = this_client_id; broadcast; ic; oc; player; get_other_players } in
   modify (fun st ->
     let new_clients = IntMap.add client.id client st.clients in
     { clients = new_clients

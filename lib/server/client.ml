@@ -9,93 +9,79 @@ module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
 type t =
   { id : int
   ; broadcast : Packet.t -> int -> unit Lwt.t
-  ; pass_to_other_client : int -> Packet.t -> unit Lwt.t
   ; ic : Lwt_io.input_channel
   ; oc : Lwt_io.output_channel
   ; player : Entities.player
+  ; get_other_players : int -> Entities.player list
   }
 
-let handle_says_me (packet : Packet.t) sender_id client =
+let handle_chat_command (packet : Packet.t) sender_id client =
   match packet with
-  | Packet.SaysMe msg ->
+  | Packet.ChatCommand msg ->
     if sender_id = client.id
     then
       (* It came from our own connection so we want to broadcast it to others *)
-      let* () = client.broadcast packet client.id in
-      let response = Packet.SaysMeResponse (true, "Message broadcasted successfully") in
+      let* () =
+        client.broadcast (Packet.ChatEvent { sender_id = client.id; message = msg }) client.id
+      in
+      let response = Packet.ChatCommandResponse (true, "Message broadcasted successfully") in
       Packet.send client.oc response
     else (
       (* It came from another client, so pass it on to our connection *)
-      let says_other_packet = Packet.SaysOther (sender_id, msg) in
-      Packet.send client.oc says_other_packet)
-  | _ -> raise (Invalid_argument "Received non-say packet in handle_says_me")
+      let event = Packet.ChatEvent { sender_id; message = msg } in
+      Packet.send client.oc event)
+  | _ -> raise (Invalid_argument "Received non-chat packet in handle_chat_command")
 ;;
 
-let handle_move_me (packet : Packet.t) sender_id client =
+let handle_move_command (packet : Packet.t) sender_id client =
   match packet with
-  | Packet.MoveMe (x, y) ->
+  | Packet.MoveCommand { x; y } ->
     if sender_id = client.id
     then (
       (* It came from our own connection so we want to broadcast it to others *)
       let success = 0 <= x && x < 10 && 0 <= y && y < 10 in
-      let* () = if success then client.broadcast packet client.id else Lwt.return_unit in
+      let* () =
+        if success
+        then client.broadcast (Packet.MoveEvent { sender_id = client.id; x; y }) client.id
+        else Lwt.return_unit
+      in
       let msg = if success then "" else "You can't go there!" in
-      let response = Packet.MoveMeResponse (success, msg) in
+      let response = Packet.MoveCommandResponse (success, msg) in
       Packet.send client.oc response)
     else (
       (* It came from another client, so pass it on to our connection *)
-      let move_other_packet = Packet.MoveOther (sender_id, x, y) in
-      Packet.send client.oc move_other_packet)
-  | _ -> raise (Invalid_argument "Received non-move packet in handle_move_me")
+      let event = Packet.MoveEvent { sender_id; x; y } in
+      Packet.send client.oc event)
+  | _ -> raise (Invalid_argument "Received non-move packet in handle_move_command")
 ;;
 
-let handle_connect_me (packet : Packet.t) sender_id client =
-  match packet with
-  | Packet.ConnectMe ->
-    if sender_id = client.id
-    then
-      (* It came from our own connection so we want to broadcast it to others and send the client our own info *)
-      let* () = client.broadcast packet client.id in
-      let response = Packet.ConnectMeResponse (true, "Connected successfully") in
-      let* () = Packet.send client.oc response in
-      let about_me_packet = Packet.AboutMe client.player in
-      Packet.send client.oc about_me_packet
-    else (
-      (* It came from another client, so pass it on to our connection and tell the new guy about us *)
-      let connect_other_packet = Packet.ConnectOther sender_id in
-      let* () = Packet.send client.oc connect_other_packet in
-      let about_me_packet = Packet.AboutOther (client.id, client.player) in
-      client.pass_to_other_client sender_id about_me_packet)
-  | _ -> raise (Invalid_argument "Received non-connect packet in handle_connect_me")
+let handle_connect_command (_packet : Packet.t) sender_id client =
+  if sender_id = client.id
+  then (
+    (* Send WelcomeEvent with our player info and all other connected players *)
+    let other_players = client.get_other_players client.id in
+    let welcome = Packet.WelcomeEvent { your_player = client.player; other_players } in
+    let* () = Packet.send client.oc welcome in
+    (* Broadcast our existence to others *)
+    client.broadcast (Packet.PlayerInfoEvent client.player) client.id)
+  else (
+    (* It came from another client — they just connected, send them our player info *)
+    let event = Packet.PlayerInfoEvent client.player in
+    Packet.send client.oc event)
 ;;
 
-let handle_about_other (packet : Packet.t) sender_id client =
+let handle_disconnect_command (packet : Packet.t) sender_id client =
   match packet with
-  | Packet.AboutOther (other_client_id, _) ->
-    if sender_id <> other_client_id
-    then raise (Invalid_argument "Sender ID does not match player info ID in handle_about_other")
-    else if sender_id = client.id
-    then
-      raise
-        (Invalid_argument "Received about_other packet from our own client in handle_about_other")
-    else
-      (* It came from another client, so pass it on to our connection *)
-      Packet.send client.oc packet
-  | _ -> raise (Invalid_argument "Received non-about_other packet in handle_about_other")
-;;
-
-let handle_disconnect_me (packet : Packet.t) sender_id client =
-  match packet with
-  | Packet.DisconnectMe ->
+  | Packet.DisconnectCommand ->
     if sender_id = client.id
     then
       (* It came from our own connection so we want to broadcast it to others *)
-      client.broadcast packet client.id
+      client.broadcast (Packet.DisconnectEvent { sender_id = client.id }) client.id
     else (
       (* It came from another client, so pass it on to our connection *)
-      let disconnect_other_packet = Packet.DisconnectOther sender_id in
-      Packet.send client.oc disconnect_other_packet)
-  | _ -> raise (Invalid_argument "Received non-disconnect packet in handle_disconnect_me")
+      let event = Packet.DisconnectEvent { sender_id } in
+      Packet.send client.oc event)
+  | _ -> raise (Invalid_argument "Received non-disconnect packet in handle_disconnect_command")
 ;;
 
 let handle_packet packet sender_id client =
@@ -109,12 +95,10 @@ let handle_packet packet sender_id client =
   in
   match packet with
   (* Directly from the connected user *)
-  | Packet.SaysMe _ -> handle_says_me packet sender_id client
-  | Packet.MoveMe _ -> handle_move_me packet sender_id client
-  | Packet.ConnectMe -> handle_connect_me packet sender_id client
-  | Packet.DisconnectMe -> handle_disconnect_me packet sender_id client
-  (* Passed on from another server client *)
-  | Packet.AboutOther _ -> handle_about_other packet sender_id client
+  | Packet.ChatCommand _ -> handle_chat_command packet sender_id client
+  | Packet.MoveCommand _ -> handle_move_command packet sender_id client
+  | Packet.ConnectCommand -> handle_connect_command packet sender_id client
+  | Packet.DisconnectCommand -> handle_disconnect_command packet sender_id client
   | _ ->
     Log_lwt.warn (fun m ->
       m "Received unrecognized packet from client %d: %s" sender_id (Packet.string_of_packet packet))

@@ -10,7 +10,7 @@ let move_player dx dy (state : Types.state) =
   let y = state.player.y + dy in
   { state with
     player = { state.player with x; y }
-  ; send_packets = Packet.MoveMe (x, y) :: state.send_packets
+  ; send_packets = Packet.MoveCommand { x; y } :: state.send_packets
   }
 ;;
 
@@ -34,7 +34,7 @@ let handle_chat_input (state : Types.state) ch =
       if String.length ed.text > 0
       then
         { (add_log ("You said: " ^ ed.text) state) with
-          send_packets = Packet.SaysMe ed.text :: state.send_packets
+          send_packets = Packet.ChatCommand ed.text :: state.send_packets
         }
       else state
     in

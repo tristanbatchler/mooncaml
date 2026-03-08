@@ -8,23 +8,36 @@ type response = bool * string [@@deriving sexp]
 
 type t =
   (* From the user *)
-  | SaysMe of string
-  | MoveMe of int * int
-  | ConnectMe
-  | DisconnectMe
+  | ChatCommand of string
+  | MoveCommand of
+      { x : int
+      ; y : int
+      }
+  | ConnectCommand
+  | DisconnectCommand
   (* From another client (forwarded by the server) *)
-  | SaysOther of int * string
-  | MoveOther of int * int * int
-  | ConnectOther of int
-  | AboutOther of int * Entities.player
-  | DisconnectOther of int
+  | ChatEvent of
+      { sender_id : int
+      ; message : string
+      }
+  | MoveEvent of
+      { sender_id : int
+      ; x : int
+      ; y : int
+      }
+  | ConnectEvent of { sender_id : int }
+  | DisconnectEvent of { sender_id : int }
   (* From the server directly *)
   | UnexpectedServerError of string
-  | SaysMeResponse of response
-  | MoveMeResponse of response
-  | ConnectMeResponse of response
-  | AboutMe of Entities.player
-  | DisconnectMeResponse of response
+  | ChatCommandResponse of response
+  | MoveCommandResponse of response
+  | ConnectCommandResponse of response
+  | DisconnectCommandResponse of response
+  | PlayerInfoEvent of Entities.player
+  | WelcomeEvent of
+      { your_player : Entities.player
+      ; other_players : Entities.player list
+      }
 [@@deriving sexp]
 
 let packet_of_string s =
