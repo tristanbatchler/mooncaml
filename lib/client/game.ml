@@ -29,23 +29,31 @@ let handle_packet (state : Types.state) packet =
   | Packet.ServerError msg -> handle_server_error state msg
 ;;
 
-let rec game_loop state ic oc =
+let run_todo _state oc = function
+  | Types.SendPacket packet ->
+    let* () = Logs_lwt.debug (fun m -> m "Sending packet: %s" (Packet.string_of_packet packet)) in
+    Lwt_io.write_line oc (Packet.string_of_packet packet)
+  | Types.Nothing -> Lwt.return_unit
+;;
+
+let rec game_loop state todo ic oc =
   let incoming = Lwt_stream.get_available server_instream in
   let state = Windows.handle_resize @@ List.fold_left handle_packet state incoming in
+  let* () = run_todo state oc todo in
   Drawing.draw_map state;
   Drawing.draw_log state;
   Drawing.draw_chat state;
   let ch = Curses.getch () in
-  let next_state =
+  let next_state, todo =
     if ch <> -1 && ch <> Curses.Key.resize
     then (
       match state.mode with
       | Chat -> Input.handle_chat_input state ch
       | World -> Input.handle_game_input state ch)
-    else state
+    else state, Types.Nothing
   in
   let* () = Lwt.pause () in
-  game_loop next_state ic oc
+  game_loop next_state todo ic oc
 ;;
 
 let run ic oc () =
@@ -69,5 +77,5 @@ let run ic oc () =
     |> Input.add_log "Welcome to the roguelike UI skeleton."
   in
   Curses.timeout 50;
-  game_loop initial_state ic oc
+  game_loop initial_state Types.Nothing ic oc
 ;;

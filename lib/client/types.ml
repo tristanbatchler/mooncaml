@@ -1,6 +1,12 @@
+open Mooncaml_shared
+
 type input_mode =
   | World
   | Chat
+
+type todo =
+  | SendPacket of Packet.t
+  | Nothing
 
 type ui =
   { map_win : Curses.window
