@@ -9,17 +9,19 @@ module Log = (val Logs.src_log src : Logs.LOG)
 module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
 module IntMap = Map.Make (Int)
 
+(* ── State stuff -───────────────────────────────────────────── *)
+
 type t =
   { clients : Client.t IntMap.t
+  ; players : Entities.player IntMap.t
   ; next_client_id : int
-  ; num_connected_clients : int
   }
 
-let state = ref { clients = IntMap.empty; next_client_id = 0; num_connected_clients = 0 }
+let state = ref { clients = IntMap.empty; players = IntMap.empty; next_client_id = 0 }
 
 let modify f =
   state := f !state;
-  Log.debug (fun m -> m "Currently %d clients connected" !state.num_connected_clients)
+  Log.debug (fun m -> m "Currently %d clients connected" (IntMap.cardinal !state.clients))
 ;;
 
 let broadcast packet sender_id =
@@ -30,25 +32,33 @@ let broadcast packet sender_id =
     (IntMap.bindings clients)
 ;;
 
-let get_other_players exclude_id =
-  let clients = !state.clients in
-  IntMap.bindings clients
-  |> List.filter_map (fun (cid, (client : Client.t)) ->
-    if cid <> exclude_id then Some client.player else None)
+(* ── Game-logic  ────────────────────────────────────────────── *)
+
+let try_move client_id x y =
+  (* TODO: add real validation (bounds, collisions) here *)
+  let st = !state in
+  match IntMap.find_opt client_id st.players with
+  | None -> false
+  | Some player ->
+    let player' = Entities.{ player with x; y } in
+    state := { st with players = IntMap.add client_id player' st.players };
+    true
 ;;
 
+let get_all_players () = IntMap.bindings !state.players |> List.map snd
+
+(* ── Client lifecycle ────────────────────────────────────────── *)
+
 let add_client ic oc =
-  let this_client_id = !state.next_client_id in
-  let pname = Printf.sprintf "Player %d" this_client_id in
-  let px = Random.int 10 in
-  let py = Random.int 10 in
-  let player = Entities.{ id = this_client_id; name = pname; x = px; y = py } in
-  let client : Client.t = { id = this_client_id; broadcast; ic; oc; player; get_other_players } in
+  let id = !state.next_client_id in
+  let player =
+    Entities.{ id; name = Printf.sprintf "Player %d" id; x = Random.int 10; y = Random.int 10 }
+  in
+  let client : Client.t = { id; broadcast; ic; oc; try_move = try_move id; get_all_players } in
   modify (fun st ->
-    let new_clients = IntMap.add client.id client st.clients in
-    { clients = new_clients
+    { clients = IntMap.add id client st.clients
+    ; players = IntMap.add id player st.players
     ; next_client_id = st.next_client_id + 1
-    ; num_connected_clients = st.num_connected_clients + 1
     });
   client
 ;;
@@ -57,9 +67,11 @@ let remove_client client_id =
   modify (fun st ->
     { st with
       clients = IntMap.remove client_id st.clients
-    ; num_connected_clients = st.num_connected_clients - 1
+    ; players = IntMap.remove client_id st.players
     })
 ;;
+
+(* ── Per-client read loop ────────────────────────────────────── *)
 
 let rec client_loop (client : Client.t) =
   let* line_opt = Lwt_io.read_line_opt client.ic in
