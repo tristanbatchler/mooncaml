@@ -52,7 +52,7 @@ let try_move_player client_id x y =
     let terrain = client.map.terrain_map.(y).(x) in
     let can_move =
       match terrain with
-      | Maps.Grass | Maps.Dirt -> true
+      | Grass | Dirt -> true
       | _ -> false
     in
     if not can_move
@@ -79,7 +79,7 @@ let add_client ic oc =
     let y = Random.int starting_map.height in
     let terrain = starting_map.terrain_map.(y).(x) in
     match terrain with
-    | Maps.Grass | Maps.Dirt -> x, y
+    | Grass | Dirt -> x, y
     | _ ->
       Log.debug (fun m -> m "Spawn point at (%d, %d) was not suitable for player, retrying..." x y);
       spawn_point ()

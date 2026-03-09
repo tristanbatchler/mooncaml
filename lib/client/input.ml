@@ -21,7 +21,7 @@ let move_player dx dy (state : Types.state) =
     let terrain = state.map.terrain_map.(desired_y).(desired_x) in
     let can_move =
       match terrain with
-      | Maps.Grass | Maps.Dirt -> true
+      | Grass | Dirt -> true
       | _ -> false
     in
     if not can_move
