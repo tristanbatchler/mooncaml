@@ -166,7 +166,7 @@ let draw_players (state : Types.state) =
 let draw_map (state : Types.state) =
   draw_terrain state;
   draw_players state;
-  ignore (Curses.wrefresh state.ui.map_win)
+  ignore (Curses.wnoutrefresh state.ui.map_win)
 ;;
 
 let draw_log (state : Types.state) =
@@ -225,7 +225,7 @@ let draw_log (state : Types.state) =
   Curses.wattron w attr;
   ignore (Curses.mvwaddstr w row col indicator);
   Curses.wattroff w attr;
-  ignore (Curses.wrefresh w)
+  ignore (Curses.wnoutrefresh w)
 ;;
 
 let draw_chat (state : Types.state) =
@@ -242,5 +242,24 @@ let draw_chat (state : Types.state) =
    | _ ->
      ignore (Curses.mvwaddstr w 0 0 (Printf.sprintf "%s says: " state.player.name));
      ignore (Curses.curs_set 0));
-  ignore (Curses.wrefresh w)
+  ignore (Curses.wnoutrefresh w)
+;;
+
+(* --- Master render function --- *)
+let draw_all (state : Types.state) =
+  (* Base windows *)
+  draw_terrain state;
+  draw_players state;
+  ignore (Curses.wnoutrefresh state.ui.map_win);
+  draw_log state;
+  draw_chat state;
+  (* Popups *)
+  (match state.popup with
+   | Types.NoPopup -> ()
+   | Types.ChoiceMenu { title; options; selected; _ } ->
+     Modals.draw_choice_menu state.ui.height state.ui.width title options selected
+   | Types.MessageBox { title; message } ->
+     Modals.draw_message_box state.ui.height state.ui.width title message);
+  (* Composite everything and push to screen! *)
+  ignore (Curses.doupdate ())
 ;;

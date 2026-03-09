@@ -19,6 +19,24 @@ type edit_line =
   ; cursor : int
   }
 
+type menu_id =
+  | MenuQuit
+  | MenuConfirmQuit
+  | MenuInspect
+
+type popup_state =
+  | NoPopup
+  | ChoiceMenu of
+      { title : string
+      ; options : string list
+      ; selected : int
+      ; id : menu_id
+      }
+  | MessageBox of
+      { title : string
+      ; message : string
+      }
+
 type state =
   { ui : ui
   ; log : string list
@@ -29,4 +47,5 @@ type state =
   ; send_packets : Packet.t list
   ; other_players : Entities.player IntMap.t
   ; map : Maps.map_data
+  ; popup : popup_state
   }

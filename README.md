@@ -4,6 +4,7 @@
 A Moonlapse MUD server and terminal client implementation in OCaml.
 
 ![Screenshot of the MoonCaml client](.github/assets/screenshot.webp)
+![Another screenshot](.github/assets/screenshot2.webp)
 
 # Dependencies
 

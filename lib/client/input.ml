@@ -1,5 +1,10 @@
 open Mooncaml_shared
 
+let src = Logs.Src.create "mooncaml_client.input" ~doc:"Input handling for the game client"
+
+module Log = (val Logs.src_log src : Logs.LOG)
+module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
+
 let max_log = 256
 
 let add_log msg (state : Types.state) =
@@ -11,6 +16,12 @@ let add_log msg (state : Types.state) =
 
 let add_logf fmt = Printf.ksprintf (fun msg state -> add_log msg state) fmt
 let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
+let is_return_key c = c = Curses.Key.enter || c = Char.code '\n'
+let is_escape_key c = c = Char.code '\x1b'
+let is_cursor_up_key c = c = Curses.Key.up || c = Char.code 'k'
+let is_cursor_down_key c = c = Curses.Key.down || c = Char.code 'j'
+
+(* ----- From other clients (forwarded by the server) -------------------------- *)
 
 let move_player dx dy (state : Types.state) =
   let desired_x = state.player.x + dx in
@@ -45,8 +56,6 @@ let prev_focus = function
   | Types.ChatWindow -> Types.LogWindow
 ;;
 
-let is_return_key c = c = Curses.Key.enter || c = Char.code '\n'
-
 let handle_map_input (state : Types.state) ch =
   match ch with
   | c when c = Curses.Key.up -> state |> move_player 0 (-1)
@@ -63,10 +72,10 @@ let handle_log_input (state : Types.state) ch =
   let max_offset = max 0 (log_len - avail_rows) in
   let offset = state.log_scroll_offset in
   match ch with
-  | c when c = Curses.Key.up || c = Char.code 'k' ->
+  | c when is_cursor_up_key c ->
     let next = min max_offset (offset + 1) in
     { state with log_scroll_offset = next }
-  | c when c = Curses.Key.down || c = Char.code 'j' ->
+  | c when is_cursor_down_key c ->
     let next = max 0 (offset - 1) in
     { state with log_scroll_offset = next }
   | c when c = Char.code 'G' -> { state with log_scroll_offset = 0 }
@@ -91,7 +100,7 @@ let handle_chat_input (state : Types.state) ch =
       else state
     in
     { state with focus = Types.MapWindow; chat = Textbox.empty_edit }
-  | c when c = Char.code '\x1b' -> { state with focus = Types.MapWindow; chat = Textbox.empty_edit }
+  | c when is_escape_key c -> { state with focus = Types.MapWindow; chat = Textbox.empty_edit }
   | c when c = Curses.Key.backspace || c = Char.code '\x7f' -> just_edit (Textbox.edit_backspace ed)
   | c when c = Curses.Key.dc -> just_edit (Textbox.edit_delete ed)
   | c when c = Curses.Key.left -> just_edit { ed with cursor = max 0 (ed.cursor - 1) }
@@ -103,15 +112,62 @@ let handle_chat_input (state : Types.state) ch =
   | _ -> state
 ;;
 
+let confirm_quit_game (state : Types.state) =
+  { state with
+    popup =
+      Types.ChoiceMenu
+        { title = "Really quit?"
+        ; options = [ "No, keep playing"; "Get me outta here!!" ]
+        ; selected = 0
+        ; id = Types.MenuConfirmQuit
+        }
+  }
+;;
+
+let handle_menu_choice (state : Types.state) id selected_index =
+  match id with
+  | Types.MenuQuit ->
+    if selected_index = 1 then confirm_quit_game state else { state with popup = NoPopup }
+  | Types.MenuConfirmQuit -> if selected_index = 1 then exit 0 else { state with popup = NoPopup }
+  | Types.MenuInspect -> state (* Placeholder for future menu *)
+;;
+
 let handle_input (state : Types.state) ch =
-  (* TAB / Shift+TAB cycle focus regardless of which window is active *)
-  if ch = Char.code '\t'
-  then { state with focus = next_focus state.focus }
-  else if ch = Curses.Key.btab
-  then { state with focus = prev_focus state.focus }
-  else (
-    match state.focus with
-    | MapWindow -> handle_map_input state ch
-    | LogWindow -> handle_log_input state ch
-    | ChatWindow -> handle_chat_input state ch)
+  match state.popup with
+  | Types.ChoiceMenu { title; options; selected; id } ->
+    let max_idx = List.length options - 1 in
+    (match ch with
+     | c when is_cursor_up_key c ->
+       { state with popup = ChoiceMenu { title; options; id; selected = max 0 (selected - 1) } }
+     | c when is_cursor_down_key c ->
+       { state with
+         popup = ChoiceMenu { title; options; id; selected = min max_idx (selected + 1) }
+       }
+     | c when is_return_key c -> handle_menu_choice state id selected
+     | c when is_escape_key c -> { state with popup = NoPopup }
+     | _ -> state)
+  | Types.MessageBox _ ->
+    if is_escape_key ch || is_return_key ch then { state with popup = NoPopup } else state
+  | Types.NoPopup ->
+    if ch = Char.code '\t'
+    then { state with focus = next_focus state.focus }
+    else if ch = Curses.Key.btab
+    then { state with focus = prev_focus state.focus }
+    else if is_escape_key ch && state.focus <> Types.ChatWindow
+    then
+      (* Spawn our generic quit menu! *)
+      { state with
+        popup =
+          Types.ChoiceMenu
+            { title = "Quit Game?"
+            ; options = [ "Resume"; "Quit" ]
+            ; selected = 0
+            ; id = Types.MenuQuit
+            }
+      }
+    else (
+      match state.focus with
+      | MapWindow -> handle_map_input state ch
+      | LogWindow -> handle_log_input state ch
+      | ChatWindow -> handle_chat_input state ch)
 ;;

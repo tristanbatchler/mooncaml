@@ -75,9 +75,7 @@ let rec game_loop state ic oc =
   let state = Windows.handle_resize @@ List.fold_left handle_packet state incoming in
   let* () = send_out_packets oc (List.rev state.send_packets) in
   let state = { state with send_packets = [] } in
-  Drawing.draw_map state;
-  Drawing.draw_log state;
-  Drawing.draw_chat state;
+  Drawing.draw_all state;
   let ch = Curses.getch () in
   let next_state =
     if ch <> -1 && ch <> Curses.Key.resize then Input.handle_input state ch else state
@@ -118,7 +116,22 @@ let run ic oc () =
     | Some m -> m
     | None -> failwith ("Unknown map name received from server: " ^ map_name)
   in
-  let initial_state =
+  let welcome_popup =
+    Types.MessageBox
+      { title = "Welcome"
+      ; message =
+          {|      .-.                                                 .; 
+       .;|/:                                             .;' 
+      .;   : .-.   .-.  . ,';. .-.   .-.    . ,';.,';.  .;   
+     .;    :;   ;';   ;';;  ;;;     ;   :   ;;  ;;  ;; ::    
+ .:'.;     :`;;'  `;;' ';  ;; `;;;;'`:::'-'';  ;;  ';_;;_.-  
+(__.'      `.          ;    `.            _;        `-'      
+
+|}
+          ^ Printf.sprintf "\t~ Welcome, %s, to %s!" player.name map.name
+      }
+  in
+  let initial_state : Types.state =
     { ui = Windows.create_windows ()
     ; log = []
     ; chat = Textbox.empty_edit
@@ -128,8 +141,8 @@ let run ic oc () =
     ; send_packets = []
     ; other_players = others_map
     ; map
+    ; popup = welcome_popup
     }
-    |> Input.add_logf "Welcome, %s, to %s!" player.name map.name
   in
   game_loop initial_state ic oc
 ;;
