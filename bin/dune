@@ -1,12 +1,14 @@
 (executable
  (public_name server_app)
  (name server_app)
+ (package mooncaml_server)
  (libraries mooncaml_server mooncaml_shared lwt logs logs.lwt fmt.tty)
  (modes exe byte))
 
 (executable
  (public_name client_app)
  (name client_app)
+ (package mooncaml_client)
  (libraries
   mooncaml_shared
   mooncaml_client
@@ -21,5 +23,6 @@
 (executable
  (public_name bmp2ml)
  (name bmp2ml)
+ (package mooncaml_shared)
  (libraries imagelib.unix fmt.tty logs logs.fmt fmt)
  (modes exe byte))

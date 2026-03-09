@@ -13,16 +13,31 @@
 
 (license MIT)
 
-(documentation
- https://github.com/tristanbatchler/mooncaml/blob/main/README.md)
+(package
+ (name mooncaml_shared)
+ (synopsis "Shared logic for Moonlapse MUD")
+ (depends
+  ocaml
+  dune
+  lwt
+  logs
+  fmt
+  sexplib
+  ppx_sexp_conv
+  ;; Dev Tools attached to the core package
+  (ocaml-lsp-server :with-dev-setup)
+  (ocamlformat :with-dev-setup)
+  (earlybird :with-dev-setup)
+  (utop :with-dev-setup)))
 
 (package
- (name mooncaml)
- (synopsis "A Moonlapse MUD server implementation in OCaml")
- (description
-  "Moonlapse MUD is a struggling-to-exist game. This is a failed attempt (calling it early) to bring it to existence with the power of functional programming. No, it's really just a fun way to spend my weekend. Oh well ¯\\_(ツ)_/¯")
- (depends ocaml dune)
- (tags
-  ("moonlapse" "mud" "game" "server")))
+ (name mooncaml_server)
+ (synopsis "A Moonlapse MUD server implementation")
+ (depends mooncaml_shared imagelib))
+
+(package
+ (name mooncaml_client)
+ (synopsis "A terminal client for Moonlapse MUD")
+ (depends mooncaml_shared curses))
 
 (map_workspace_root false)
