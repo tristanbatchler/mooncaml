@@ -11,7 +11,7 @@ type t =
   ; broadcast : Packet.t -> int -> unit Lwt.t
   ; ic : Lwt_io.input_channel
   ; oc : Lwt_io.output_channel (* Server Logic Hooks *)
-  ; try_move : int -> int -> bool
+  ; try_move_player : int -> int -> bool
   ; get_all_players : unit -> Entities.player list
   ; get_player : unit -> Entities.player
   ; map : Maps.map_data
@@ -31,7 +31,7 @@ let handle_move_command (packet : Packet.t) client =
   match packet with
   | Packet.MoveCommand { x; y } ->
     (* Ask the Hub to apply the physics *)
-    let success = client.try_move x y in
+    let success = client.try_move_player x y in
     let* () =
       if success
       then client.broadcast (Packet.MoveEvent { sender_id = client.id; x; y }) client.id

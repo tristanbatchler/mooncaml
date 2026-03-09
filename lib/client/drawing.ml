@@ -1,5 +1,6 @@
 open Mooncaml_shared
 
+let cell_width = 2
 let color_pair_player = 1
 let color_pair_other_player = 2
 let color_pair_grass = 3
@@ -40,66 +41,104 @@ let wrap_text width msg =
     go [] 0)
 ;;
 
+let hash_coord col row =
+  (* Some large primes *)
+  let p1 = 101051
+  and p2 = 5001743
+  and p3 = 1274126177 in
+  (* Fancy hash and scramble to reduce linear patterns *)
+  let h = col * p1 lxor (row * p2) in
+  let h = h lxor (h lsr 13) * p3 in
+  abs (h lxor (h lsr 16)) mod 1000
+;;
+
+let terrain_char terrain col row =
+  let h = hash_coord col row in
+  match terrain with
+  | Maps.Grass -> if h < 750 then ',' else if h < 900 then ';' else '\''
+  | Maps.Dirt -> if h < 600 then '.' else if h < 850 then '`' else ':'
+  | Maps.Wall -> if h < 900 then '#' else if h < 950 then '[' else ']'
+  | Maps.Water -> if h < 850 then '~' else '-'
+  | Maps.OutOfBounds -> ' '
+;;
+
 let draw_terrain (state : Types.state) =
   ensure_colors ();
   let w = state.ui.map_win in
   let win_h, win_w = Curses.getmaxyx w in
-  let view_w = win_w - 2 in
-  let view_h = win_h - 2 in
+  let view_cols = win_w - 2 in
+  let view_rows = win_h - 2 in
+  let cells_w = view_cols / cell_width in
+  let cells_h = view_rows in
   Curses.werase w;
   Curses.box w 0 0;
-  let cam_x = state.player.x - (view_w / 2) in
-  let cam_y = state.player.y - (view_h / 2) in
-  for sy = 0 to view_h - 1 do
-    for sx = 0 to view_w - 1 do
-      (* Translate screen coordinate to map coordinate *)
-      let mx = cam_x + sx in
-      let my = cam_y + sy in
-      if mx >= 0 && mx < state.map.width && my >= 0 && my < state.map.height
-      then (
-        match state.map.terrain_map.(my).(mx) with
-        | OutOfBounds -> ()
-        | terrain ->
-          let pseudorandom_10 = ((mx * 31) + (my * 17)) mod 10 in
-          let glyph, pair =
-            match terrain with
-            | Grass -> (if pseudorandom_10 < 7 then "," else ";"), color_pair_grass
-            | Dirt -> (if pseudorandom_10 < 5 then "." else "`"), color_pair_dirt
-            | Wall -> "#", color_pair_wall
-            | Water -> (if pseudorandom_10 < 5 then "~" else "-"), color_pair_water
-            | OutOfBounds -> assert false
-          in
-          let attr = Curses.A.color_pair pair in
-          Curses.wattron w attr;
-          (* Draw to the screen coordinates (+1 for border) *)
-          ignore (Curses.mvwaddstr w (sy + 1) (sx + 1) glyph);
-          Curses.wattroff w attr)
-    done
-  done
+  let cam_x = state.player.x - (cells_w / 2) in
+  let cam_y = state.player.y - (cells_h / 2) in
+  let draw_cell cx cy =
+    let mx = cam_x + cx in
+    let my = cam_y + cy in
+    if mx >= 0 && mx < state.map.width && my >= 0 && my < state.map.height
+    then (
+      match state.map.terrain_map.(my).(mx) with
+      | OutOfBounds -> ()
+      | terrain ->
+        let pair =
+          match terrain with
+          | Grass -> color_pair_grass
+          | Dirt -> color_pair_dirt
+          | Wall -> color_pair_wall
+          | Water -> color_pair_water
+          | OutOfBounds -> assert false
+        in
+        let glyph =
+          String.init cell_width (fun i ->
+            let col = (mx * cell_width) + i in
+            let row = my in
+            terrain_char terrain col row)
+        in
+        let attr = Curses.A.color_pair pair in
+        Curses.wattron w attr;
+        ignore (Curses.mvwaddstr w (cy + 1) ((cx * cell_width) + 1) glyph);
+        Curses.wattroff w attr)
+  in
+  let rec row cy =
+    if cy < cells_h
+    then (
+      let rec col cx =
+        if cx < cells_w
+        then (
+          draw_cell cx cy;
+          col (cx + 1))
+      in
+      col 0;
+      row (cy + 1))
+  in
+  row 0
 ;;
 
 let draw_players (state : Types.state) =
   let w = state.ui.map_win in
   let win_h, win_w = Curses.getmaxyx w in
-  let view_w = win_w - 2 in
-  let view_h = win_h - 2 in
-  (* Same camera calculation *)
-  let cam_x = state.player.x - (view_w / 2) in
-  let cam_y = state.player.y - (view_h / 2) in
-  let draw_entity color map_x map_y ch =
-    let sx = map_x - cam_x in
-    let sy = map_y - cam_y in
-    if sx >= 0 && sx < view_w && sy >= 0 && sy < view_h
+  let view_cols = win_w - 2 in
+  let view_rows = win_h - 2 in
+  let cells_w = view_cols / cell_width in
+  let cells_h = view_rows in
+  let cam_x = state.player.x - (cells_w / 2) in
+  let cam_y = state.player.y - (cells_h / 2) in
+  let draw_entity color map_x map_y glyph =
+    let cx = map_x - cam_x in
+    let cy = map_y - cam_y in
+    if cx >= 0 && cx < cells_w && cy >= 0 && cy < cells_h
     then (
       let attr = Curses.A.color_pair color in
       Curses.wattron w attr;
-      ignore (Curses.mvwaddch w (sy + 1) (sx + 1) (Char.code ch));
+      ignore (Curses.mvwaddstr w (cy + 1) ((cx * cell_width) + 1) glyph);
       Curses.wattroff w attr)
   in
   Types.IntMap.iter
-    (fun _ (other : Entities.player) -> draw_entity color_pair_other_player other.x other.y 'O')
+    (fun _ (other : Entities.player) -> draw_entity color_pair_other_player other.x other.y " O")
     state.other_players;
-  draw_entity color_pair_player state.player.x state.player.y '@'
+  draw_entity color_pair_player state.player.x state.player.y " @"
 ;;
 
 let draw_map (state : Types.state) =

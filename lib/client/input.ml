@@ -8,11 +8,23 @@ let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
 let move_player dx dy (state : Types.state) =
   let desired_x = state.player.x + dx in
   let desired_y = state.player.y + dy in
-  { state with
-    (* Optimistic prediction: update player coordinates immediately *)
-    player = { state.player with x = desired_x; y = desired_y }
-  ; send_packets = Packet.MoveCommand { x = desired_x; y = desired_y } :: state.send_packets
-  }
+  if desired_x < 0 || desired_y < 0 || desired_x >= state.map.width || desired_y >= state.map.height
+  then state
+  else (
+    let terrain = state.map.terrain_map.(desired_y).(desired_x) in
+    let can_move =
+      match terrain with
+      | Maps.Grass | Maps.Dirt -> true
+      | _ -> false
+    in
+    if not can_move
+    then state
+    else
+      { state with
+        (* Optimistic prediction: update player coordinates immediately *)
+        player = { state.player with x = desired_x; y = desired_y }
+      ; send_packets = Packet.MoveCommand { x = desired_x; y = desired_y } :: state.send_packets
+      })
 ;;
 
 let handle_game_input (state : Types.state) ch =

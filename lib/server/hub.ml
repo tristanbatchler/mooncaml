@@ -44,24 +44,27 @@ let broadcast packet sender_id =
 
 let starting_map = Maps.get Maps.Oasis
 
-let try_move client_id x y =
+let try_move_player client_id x y =
   let client = IntMap.find client_id !state.clients in
-  let terrain = client.map.terrain_map.(y).(x) in
-  let can_move =
-    match terrain with
-    | Maps.Grass | Maps.Dirt -> true
-    | _ -> false
-  in
-  if not can_move
+  if x < 0 || y < 0 || x >= client.map.width || y >= client.map.height
   then false
   else (
-    let st = !state in
-    match IntMap.find_opt client_id st.players with
-    | None -> false
-    | Some player ->
-      let player' = Entities.{ player with x; y } in
-      modify (fun st -> { st with players = IntMap.add client_id player' st.players });
-      true)
+    let terrain = client.map.terrain_map.(y).(x) in
+    let can_move =
+      match terrain with
+      | Maps.Grass | Maps.Dirt -> true
+      | _ -> false
+    in
+    if not can_move
+    then false
+    else (
+      let st = !state in
+      match IntMap.find_opt client_id st.players with
+      | None -> false
+      | Some player ->
+        let player' = Entities.{ player with x; y } in
+        modify (fun st -> { st with players = IntMap.add client_id player' st.players });
+        true))
 ;;
 
 let get_all_players () = IntMap.bindings !state.players |> List.map snd
@@ -88,7 +91,7 @@ let add_client ic oc =
     ; broadcast
     ; ic
     ; oc
-    ; try_move = try_move id
+    ; try_move_player = try_move_player id
     ; get_all_players
     ; get_player = get_player id
     ; map = starting_map
