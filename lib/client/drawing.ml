@@ -84,6 +84,16 @@ let draw_terrain (state : Types.state) =
   let cells_h = view_rows in
   Curses.werase w;
   draw_border w (state.focus = MapWindow);
+  let indicator = Printf.sprintf "Mooncaml :: %s" state.map.name in
+  let col = 1 in
+  let attr =
+    if state.focus = MapWindow
+    then Curses.A.color_pair color_pair_border_focused
+    else Curses.A.color_pair color_pair_border_unfocused
+  in
+  Curses.wattron w attr;
+  ignore (Curses.mvwaddstr w 0 col indicator);
+  Curses.wattroff w attr;
   let cam_x = state.player.x - (cells_w / 2) in
   let cam_y = state.player.y - (cells_h / 2) in
   let draw_cell cx cy =
@@ -207,7 +217,11 @@ let draw_log (state : Types.state) =
   let indicator = Printf.sprintf "[%s]" percent in
   let col = win_w - String.length indicator - 1 in
   let row = Windows.log_height - 1 in
-  let attr = Curses.A.color_pair color_pair_border_focused in
+  let attr =
+    if state.focus = LogWindow
+    then Curses.A.color_pair color_pair_border_focused
+    else Curses.A.color_pair color_pair_border_unfocused
+  in
   Curses.wattron w attr;
   ignore (Curses.mvwaddstr w row col indicator);
   Curses.wattroff w attr;
@@ -226,7 +240,7 @@ let draw_chat (state : Types.state) =
      ignore (Curses.wmove w 0 (prompt_len + state.chat.cursor));
      ignore (Curses.curs_set 1)
    | _ ->
-     ignore (Curses.mvwaddstr w 0 0 "Press ENTER to chat");
+     ignore (Curses.mvwaddstr w 0 0 (Printf.sprintf "%s says: " state.player.name));
      ignore (Curses.curs_set 0));
   ignore (Curses.wrefresh w)
 ;;
