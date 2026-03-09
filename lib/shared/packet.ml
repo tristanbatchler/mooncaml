@@ -1,5 +1,4 @@
 open Sexplib.Std
-open Lwt.Syntax
 
 let src = Logs.Src.create "mooncaml_shared.packet" ~doc:"Network packets"
 
@@ -56,6 +55,5 @@ let string_of_packet p = Sexplib.Sexp.to_string (sexp_of_t p)
 let send oc packet =
   let s = string_of_packet packet in
   Log.debug (fun m -> m "Sending packet: %s" s);
-  let* () = Lwt_io.write_line oc s in
-  Lwt_io.flush oc
+  Lwt_io.write_line oc s
 ;;

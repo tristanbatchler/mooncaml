@@ -18,11 +18,11 @@ let ensure_colors () =
     then (
       ignore (Curses.start_color ());
       ignore (Curses.use_default_colors ());
-      ignore (Curses.init_pair color_pair_player Curses.Color.white (-1));
+      ignore (Curses.init_pair color_pair_player (-1) (-1));
       ignore (Curses.init_pair color_pair_other_player Curses.Color.magenta (-1));
       ignore (Curses.init_pair color_pair_grass Curses.Color.green (-1));
       ignore (Curses.init_pair color_pair_dirt Curses.Color.yellow (-1));
-      ignore (Curses.init_pair color_pair_wall Curses.Color.white (-1));
+      ignore (Curses.init_pair color_pair_wall (-1) (-1));
       ignore (Curses.init_pair color_pair_water Curses.Color.blue (-1));
       ignore (Curses.init_pair color_pair_border_focused Curses.Color.cyan (-1));
       ignore (Curses.init_pair color_pair_border_unfocused (-1) (-1)));
