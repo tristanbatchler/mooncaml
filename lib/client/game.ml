@@ -80,12 +80,7 @@ let rec game_loop state ic oc =
   Drawing.draw_chat state;
   let ch = Curses.getch () in
   let next_state =
-    if ch <> -1 && ch <> Curses.Key.resize
-    then (
-      match state.mode with
-      | Chat -> Input.handle_chat_input state ch
-      | World -> Input.handle_game_input state ch)
-    else state
+    if ch <> -1 && ch <> Curses.Key.resize then Input.handle_input state ch else state
   in
   let* () = Lwt.pause () in
   game_loop next_state ic oc
@@ -128,7 +123,8 @@ let run ic oc () =
     ; log = []
     ; chat = Textbox.empty_edit
     ; player
-    ; mode = Types.World
+    ; focus = Types.MapWindow
+    ; log_scroll_offset = 0
     ; send_packets = []
     ; other_players = others_map
     ; map

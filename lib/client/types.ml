@@ -1,9 +1,10 @@
 open Mooncaml_shared
 module IntMap = Map.Make (Int)
 
-type input_mode =
-  | World
-  | Chat
+type window_focus =
+  | MapWindow
+  | LogWindow
+  | ChatWindow
 
 type ui =
   { map_win : Curses.window
@@ -23,7 +24,8 @@ type state =
   ; log : string list
   ; chat : edit_line
   ; player : Entities.player
-  ; mode : input_mode
+  ; focus : window_focus
+  ; log_scroll_offset : int
   ; send_packets : Packet.t list
   ; other_players : Entities.player IntMap.t
   ; map : Maps.map_data

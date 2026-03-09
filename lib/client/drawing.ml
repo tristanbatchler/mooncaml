@@ -7,6 +7,8 @@ let color_pair_grass = 3
 let color_pair_dirt = 4
 let color_pair_wall = 5
 let color_pair_water = 6
+let color_pair_border_focused = 7
+let color_pair_border_unfocused = 8
 let colors_ready = ref false
 
 let ensure_colors () =
@@ -21,8 +23,18 @@ let ensure_colors () =
       ignore (Curses.init_pair color_pair_grass Curses.Color.green (-1));
       ignore (Curses.init_pair color_pair_dirt Curses.Color.yellow (-1));
       ignore (Curses.init_pair color_pair_wall Curses.Color.white (-1));
-      ignore (Curses.init_pair color_pair_water Curses.Color.blue (-1)));
+      ignore (Curses.init_pair color_pair_water Curses.Color.blue (-1));
+      ignore (Curses.init_pair color_pair_border_focused Curses.Color.cyan (-1));
+      ignore (Curses.init_pair color_pair_border_unfocused (-1) (-1)));
     colors_ready := true)
+;;
+
+let draw_border win is_focused =
+  let pair = if is_focused then color_pair_border_focused else color_pair_border_unfocused in
+  let attr = Curses.A.color_pair pair in
+  Curses.wattron win attr;
+  Curses.box win 0 0;
+  Curses.wattroff win attr
 ;;
 
 (* Split a message into lines that fit within [width] columns *)
@@ -71,7 +83,7 @@ let draw_terrain (state : Types.state) =
   let cells_w = view_cols / cell_width in
   let cells_h = view_rows in
   Curses.werase w;
-  Curses.box w 0 0;
+  draw_border w (state.focus = MapWindow);
   let cam_x = state.player.x - (cells_w / 2) in
   let cam_y = state.player.y - (cells_h / 2) in
   let draw_cell cx cy =
@@ -153,9 +165,21 @@ let draw_log (state : Types.state) =
   let inner_w = max 1 (win_w - 2) in
   let avail_rows = Windows.log_height - 2 in
   Curses.werase w;
-  Curses.box w 0 0;
-  (* state.log is newest-first.  Collect wrapped line-groups from newest to
-     oldest, prepending each group so List.concat yields oldest-first order. *)
+  draw_border w (state.focus = LogWindow);
+  let log_len = List.length state.log in
+  let max_offset = max 0 (log_len - avail_rows) in
+  let offset = min (max 0 state.log_scroll_offset) max_offset in
+  let scrolled_log =
+    let rec drop n lst =
+      if n <= 0
+      then lst
+      else (
+        match lst with
+        | [] -> []
+        | _ :: rest -> drop (n - 1) rest)
+    in
+    drop offset state.log
+  in
   let rec collect acc remaining = function
     | ([] | _ :: _) when remaining <= 0 -> acc
     | [] -> acc
@@ -165,12 +189,28 @@ let draw_log (state : Types.state) =
       if n <= remaining
       then collect (lines :: acc) (remaining - n) rest
       else (
-        (* Partially visible: show the last [remaining] lines *)
         let tail = List.rev lines |> Util.take remaining |> List.rev in
         tail :: acc)
   in
-  let visible_lines = collect [] avail_rows state.log |> List.concat in
+  let visible_lines = collect [] avail_rows scrolled_log |> List.concat in
   List.iteri (fun i line -> ignore (Curses.mvwaddstr w (i + 1) 1 line)) visible_lines;
+  let percent =
+    if offset = 0
+    then "Bot"
+    else if offset = max_offset
+    then "Top"
+    else
+      Printf.sprintf
+        "%d%%"
+        (100 - int_of_float (100. *. float_of_int offset /. float_of_int (max 1 max_offset)))
+  in
+  let indicator = Printf.sprintf "[%s]" percent in
+  let col = win_w - String.length indicator - 1 in
+  let row = Windows.log_height - 1 in
+  let attr = Curses.A.color_pair color_pair_border_focused in
+  Curses.wattron w attr;
+  ignore (Curses.mvwaddstr w row col indicator);
+  Curses.wattroff w attr;
   ignore (Curses.wrefresh w)
 ;;
 
@@ -179,14 +219,14 @@ let draw_chat (state : Types.state) =
   let prompt = "> " in
   let prompt_len = String.length prompt in
   Curses.werase w;
-  (match state.mode with
-   | World ->
-     ignore (Curses.mvwaddstr w 0 0 "Press ENTER to chat");
-     ignore (Curses.curs_set 0)
-   | Chat ->
+  (match state.focus with
+   | ChatWindow ->
      ignore (Curses.mvwaddstr w 0 0 (prompt ^ state.chat.text));
      Curses.wclrtoeol w;
      ignore (Curses.wmove w 0 (prompt_len + state.chat.cursor));
-     ignore (Curses.curs_set 1));
+     ignore (Curses.curs_set 1)
+   | _ ->
+     ignore (Curses.mvwaddstr w 0 0 "Press ENTER to chat");
+     ignore (Curses.curs_set 0));
   ignore (Curses.wrefresh w)
 ;;
