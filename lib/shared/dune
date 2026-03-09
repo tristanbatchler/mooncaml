@@ -1,5 +1,6 @@
 (library
  (name mooncaml_shared)
+ (public_name mooncaml_shared)
  (libraries sexplib logs logs.lwt logs.fmt fmt.tty lwt lwt.unix)
  (preprocess
   (pps ppx_sexp_conv)))
@@ -8,10 +9,11 @@
  (mode promote)
  (targets maps.ml)
  (deps
-	%{bin:bmp2ml}
-	(glob_files %{workspace_root}/data/maps/*.bmp))
+  %{bin:bmp2ml}
+  (glob_files %{workspace_root}/data/maps/*.bmp))
+ (enabled_if %{lib-available:imagelib.unix}) 
  (action
-	(run
-	 %{bin:bmp2ml}
-	 --input-dir %{workspace_root}/data/maps
-	 --output-file ./maps.ml)))
+  (run
+   %{bin:bmp2ml}
+   --input-dir %{workspace_root}/data/maps
+   --output-file ./maps.ml)))

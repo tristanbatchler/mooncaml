@@ -23,6 +23,7 @@
 (executable
  (public_name bmp2ml)
  (name bmp2ml)
- (package mooncaml_shared)
+ (package mooncaml_server)
+ (optional)
  (libraries imagelib.unix fmt.tty logs logs.fmt fmt)
  (modes exe byte))
