@@ -42,22 +42,7 @@ let init_db_and_start_server port =
     in
     Logs.err (fun m -> m "FATAL: Failed to connect to database: %s" err_msg);
     Lwt.fail_with "Database initialization failed"
-  | Ok pool ->
-    Logs.info (fun m -> m "Database connected! Running health check...");
-    let* version_result = Mooncaml_server_db.Queries.get_psql_version pool in
-    (* Fix 2: Unpack the double-wrapped Result! *)
-    (match version_result with
-     | Ok (Ok version_str) -> Logs.info (fun m -> m "DB Health Check OK | %s" version_str)
-     | Ok (Error err) -> Logs.err (fun m -> m "Failed to query version: %s" (Caqti_error.show err))
-     | Error err ->
-       let err_msg =
-         match err with
-         | `Connection_error e -> e
-         | _ -> "Unknown error"
-       in
-       Logs.err (fun m -> m "Failed to get DB connection from pool: %s" err_msg));
-    Logs.info (fun m -> m "Starting game server...");
-    Server.start port
+  | Ok pool -> Server.start port pool
 ;;
 
 let () =

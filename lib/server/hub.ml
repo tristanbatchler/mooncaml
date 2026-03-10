@@ -72,7 +72,7 @@ let get_player client_id () = IntMap.find client_id !state.players
 
 (* ── Client lifecycle ────────────────────────────────────────── *)
 
-let add_client ic oc =
+let add_client (ic, oc) db_pool =
   let id = !state.next_client_id in
   let rec spawn_point () =
     let x = Random.int starting_map.width in
@@ -95,6 +95,7 @@ let add_client ic oc =
     ; get_all_players
     ; get_player = get_player id
     ; map = starting_map
+    ; db_pool
     }
   in
   modify (fun st ->

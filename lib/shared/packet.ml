@@ -15,6 +15,14 @@ type t =
       }
   | ConnectCommand
   | DisconnectCommand
+  | LoginCommand of
+      { username : string
+      ; password : string
+      }
+  | RegisterCommand of
+      { username : string
+      ; password : string
+      }
   (* From another client (forwarded by the server) *)
   | ChatEvent of
       { sender_id : int
@@ -43,6 +51,8 @@ type t =
       ; other_players : Entities.player list
       ; map_name : string
       }
+  | LoginCommandResponse of response
+  | RegisterCommandResponse of response
 [@@deriving sexp]
 
 let packet_of_string s =

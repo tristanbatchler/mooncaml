@@ -15,6 +15,7 @@ type t =
   ; get_all_players : unit -> Entities.player list
   ; get_player : unit -> Entities.player
   ; map : Maps.map_data
+  ; db_pool : Mooncaml_server_db.Types.pool
   }
 
 let handle_chat_command (packet : Packet.t) client =
