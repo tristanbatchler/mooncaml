@@ -1,0 +1,3 @@
+(library
+ (name mooncaml_server_db)
+ (libraries lwt lwt.unix caqti caqti-lwt caqti-lwt.unix caqti-driver-postgresql))

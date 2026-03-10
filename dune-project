@@ -33,7 +33,13 @@
 (package
  (name mooncaml_server)
  (synopsis "A Moonlapse MUD server implementation")
- (depends mooncaml_shared imagelib caqti caqti-lwt caqti-driver-postgresql ppx_rapper argon2))
+ (depends
+  mooncaml_shared
+  imagelib
+  caqti
+  caqti-lwt
+  caqti-driver-postgresql
+  argon2))
 
 (package
  (name mooncaml_client)

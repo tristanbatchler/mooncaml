@@ -13,7 +13,6 @@ depends: [
   "caqti"
   "caqti-lwt"
   "caqti-driver-postgresql"
-  "ppx_rapper"
   "argon2"
   "odoc" {with-doc}
 ]

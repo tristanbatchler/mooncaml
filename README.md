@@ -11,6 +11,8 @@ A Moonlapse MUD server and terminal client implementation in OCaml.
 - A Unix OS (Windows not currently supported, but WSL should work fine)
 - [OCaml](https://ocaml.org/install#linux_mac_bsd) 5.2.1 or later
 - Ncurses if you're building the client (probably installed already, but especially make sure if you're on WSL)
+- Argon2 if you're building the server - don't ask me which version, too lazy to check
+- PostgreSQL if you're building the server - it works for version 18.3, but it's possible older versions will work.
 
 
 # Quick start
@@ -62,6 +64,19 @@ opam install . --deps-only --with-dev-setup
 Depending on what you installed, you can boot up the respective applications using Dune:
 
 **To run the server:**
+
+You'll need to have an empty PostgreSQL database setup and ready to go. Then you'll need to set some environment variables:
+
+* `DB_HOST` (defaults to `127.0.0.1`)
+* `DB_PORT` (defaults to `5432`)
+* `DB_NAME` **required**
+* `DB_USER` **required**
+* `DB_PASSWORD` **required**
+* `DB_POOL_SIZE` (defaults to `10`)
+
+I like to just put a `.env` file and use a tool like `direnv`, but you can just export them however you like with your shell before proceeding.
+
+To run the server, simply execute:
 
 ```shell
 dune exec server_app

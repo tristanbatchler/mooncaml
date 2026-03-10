@@ -2,7 +2,7 @@
  (public_name server_app)
  (name server_app)
  (package mooncaml_server)
- (libraries mooncaml_server mooncaml_shared lwt logs logs.lwt fmt.tty)
+ (libraries mooncaml_server mooncaml_server_db mooncaml_shared lwt logs logs.lwt fmt.tty)
  (modes exe byte))
 
 (executable
