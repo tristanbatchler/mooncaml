@@ -8,7 +8,7 @@ echo -e "# Project Summary\n" > "$outputFile"
 
 # Extensions regex (same filtering behavior as PowerShell)
 # Matches files with specific extensions OR files with no extension (LICENSE, PKGBUILD, etc)
-regex='\.(cpp|h|hpp|c|cs|py|js|ts|java|go|rs|nim|sh|ps1|gd|jsonc|json|pyi|md|ml)$|^[^.]+$'
+regex='\.(cpp|h|hpp|c|cs|py|js|ts|java|go|rs|nim|sh|ps1|gd|jsonc|json|pyi|md|ml|sql)$|^[^.]+$'
 
 # Process each git-tracked file
 git ls-files | grep -E "$regex" | while IFS= read -r file; do
@@ -57,6 +57,7 @@ git ls-files | grep -E "$regex" | while IFS= read -r file; do
                 .json)        lang="json" ;;
                 .pyi)         lang="python" ;;
                 .ml)          lang="ocaml" ;;
+                .sql)         lang="sql" ;;
                 *)            lang="" ;;
             esac
             ;;
