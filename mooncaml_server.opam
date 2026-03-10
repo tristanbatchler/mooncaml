@@ -10,6 +10,11 @@ depends: [
   "dune" {>= "3.7"}
   "mooncaml_shared"
   "imagelib"
+  "caqti"
+  "caqti-lwt"
+  "caqti-driver-postgresql"
+  "ppx_rapper"
+  "argon2"
   "odoc" {with-doc}
 ]
 build: [

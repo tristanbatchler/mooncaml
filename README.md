@@ -9,7 +9,7 @@ A Moonlapse MUD server and terminal client implementation in OCaml.
 # Dependencies
 
 - A Unix OS (Windows not currently supported, but WSL should work fine)
-- [OCaml](https://ocaml.org/install#linux_mac_bsd) 5.4.0 or later
+- [OCaml](https://ocaml.org/install#linux_mac_bsd) 5.2.1 or later
 - Ncurses if you're building the client (probably installed already, but especially make sure if you're on WSL)
 
 
@@ -21,7 +21,7 @@ Depending on what you want to do, you gotta clone the repo first and set up a lo
 ```shell
 git clone [https://github.com/tristanbatchler/mooncaml](https://github.com/tristanbatchler/mooncaml)
 cd mooncaml
-opam switch create . --no-install
+opam switch create . ocaml-base-compiler.5.2.1 --no-install
 eval $(opam env)
 ```
 
