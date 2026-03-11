@@ -245,7 +245,21 @@ let handle_popup_input (c_state : Types.client_state) popup ch =
        then apply (fun e -> Textbox.edit_insert e c)
        else popup, []
      | _ -> popup, [])
-  | MessageBox _ -> if is_escape_key ch || is_return_key ch then NoPopup, [] else popup, []
+  | MessageBox _ ->
+    if is_escape_key ch || is_return_key ch
+    then (
+      match c_state.mode with
+      | Title _ ->
+        (* If we dismiss a message box on the title screen, go back to the menu! *)
+        ( ChoiceMenu
+            { title = "Mooncaml"
+            ; options = [ "Login"; "Register"; "Quit" ]
+            ; selected = 0
+            ; id = MenuTitle
+            }
+        , [] )
+      | Game _ -> NoPopup, [])
+    else popup, []
   | NoPopup -> NoPopup, []
 ;;
 

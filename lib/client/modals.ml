@@ -34,8 +34,7 @@ let draw_message_box win_h win_w title message =
   let title_pad = (width - String.length title - 2) / 2 in
   ignore (Curses.mvwaddstr win 0 title_pad (" " ^ title ^ " "));
   List.iteri (fun i line -> ignore (Curses.mvwaddstr win (i + 2) 2 line)) lines;
-  (* Draw OK button centered at the bottom *)
-  let ok_label = "[ OK ]" in
+  let ok_label = "OK" in
   let ok_col = (width - String.length ok_label) / 2 in
   let ok_row = height - 3 in
   Curses.wattron win Curses.A.reverse;

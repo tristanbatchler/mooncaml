@@ -73,7 +73,18 @@ let handle_packet (state : Types.client_state) packet =
       }
     in
     { state with mode = Game g_state }
-  (* All other packets only matter if we are currently IN THE GAME *)
+  (* --- Auth Responses on the Title Screen --- *)
+  | Types.Title _, Packet.LoginCommandResponse (false, msg) ->
+    let popup = Types.MessageBox { title = "Login Failed"; message = msg } in
+    { state with mode = Title { popup } }
+  | Types.Title _, Packet.RegisterCommandResponse (success, msg) ->
+    let title = if success then "Success" else "Registration Failed" in
+    let popup = Types.MessageBox { title; message = msg } in
+    { state with mode = Title { popup } }
+  | Types.Title _, Packet.UnexpectedServerError msg ->
+    let popup = Types.MessageBox { title = "Server Error"; message = msg } in
+    { state with mode = Title { popup } }
+  (* --- In-game packets --- *)
   | Types.Game g_state, _ ->
     let new_g_state =
       match packet with

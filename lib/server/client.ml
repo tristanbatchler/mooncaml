@@ -24,9 +24,31 @@ type t =
   ; remove_player_from_world : int -> unit
   }
 
+let gen_salt len =
+  let rand_char _ = Char.chr (65 + Random.int 26) in
+  String.init len rand_char
+;;
+
+let hash_password pwd =
+  let t_cost = 2 in
+  let m_cost = 65536 in
+  let parallelism = 1 in
+  let hash_len = 32 in
+  let salt_len = 16 in
+  let salt = gen_salt salt_len in
+  let encoded_len =
+    Argon2.encoded_len ~t_cost ~m_cost ~parallelism ~salt_len ~hash_len ~kind:Argon2.ID
+  in
+  match Argon2.ID.hash_encoded ~t_cost ~m_cost ~parallelism ~hash_len ~encoded_len ~pwd ~salt with
+  | Result.Ok encoded -> Argon2.ID.encoded_to_string encoded
+  | Result.Error e -> failwith (Argon2.ErrorCodes.message e)
+;;
+
 let verify_password ~encoded ~pwd =
-  match Argon2.verify ~encoded ~pwd ~kind:Argon2.D with
-  | Result.Ok valid -> valid
+  match Argon2.verify ~encoded ~pwd ~kind:Argon2.ID with
+  | Result.Ok true -> true
+  | Result.Ok false -> false
+  | Result.Error Argon2.ErrorCodes.VERIFY_MISMATCH -> false
   | Result.Error e ->
     Logs.err (fun m -> m "Argon2 verify error: %s" (Argon2.ErrorCodes.message e));
     false
@@ -76,16 +98,11 @@ let handle_register client username password =
     Lwt.return Lobby
   | Ok (Ok None) ->
     let hash_res =
-      Argon2.hash
-        ~t_cost:2
-        ~m_cost:65536
-        ~parallelism:1
-        ~pwd:password
-        ~salt:"mooncaml_salt_123"
-        ~kind:Argon2.ID
-        ~hash_len:32
-        ~encoded_len:128
-        ~version:Argon2.VERSION_13
+      try
+        let hash = hash_password password in
+        Ok ((), hash)
+      with
+      | e -> Error (Printexc.to_string e)
     in
     (match hash_res with
      | Ok (_, hash) ->
