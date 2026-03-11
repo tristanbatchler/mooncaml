@@ -29,6 +29,26 @@ let ensure_colors () =
     colors_ready := true)
 ;;
 
+let logo_art =
+  [ {|      .-.                                                 .; |}
+  ; {|      .;|/:                                             .;'  |}
+  ; {|      .;   : .-.   .-.  . ,';. .-.   .-.    . ,';.,';.  .;   |}
+  ; {|     .;    :;   ;';   ;';;  ;;;     ;   :   ;;  ;;  ;; ::    |}
+  ; {| .:'.;     :`;;'  `;;' ';  ;; `;;;;'`:::'-'';  ;;  ';_;;_.-  |}
+  ; {|(__.'      `.          ;    `.            _;        `-'      |}
+  ]
+;;
+
+let draw_title_screen win_h win_w =
+  let w = Curses.stdscr () in
+  Curses.werase w;
+  let logo_w = String.length (List.hd logo_art) in
+  let start_y = (win_h / 2) - 8 in
+  let start_x = (win_w - logo_w) / 2 in
+  List.iteri (fun i line -> ignore (Curses.mvwaddstr w (start_y + i) start_x line)) logo_art;
+  ignore (Curses.wnoutrefresh w)
+;;
+
 let draw_border win is_focused =
   let pair = if is_focused then color_pair_border_focused else color_pair_border_unfocused in
   let attr = Curses.A.color_pair pair in
@@ -74,7 +94,7 @@ let terrain_char terrain col row =
   | Maps.OutOfBounds -> ' '
 ;;
 
-let draw_terrain (state : Types.state) =
+let draw_terrain (state : Types.game_state) =
   ensure_colors ();
   let w = state.ui.map_win in
   let win_h, win_w = Curses.getmaxyx w in
@@ -138,7 +158,7 @@ let draw_terrain (state : Types.state) =
   row 0
 ;;
 
-let draw_players (state : Types.state) =
+let draw_players (state : Types.game_state) =
   let w = state.ui.map_win in
   let win_h, win_w = Curses.getmaxyx w in
   let view_cols = win_w - 2 in
@@ -163,13 +183,13 @@ let draw_players (state : Types.state) =
   draw_entity color_pair_player state.player.x state.player.y " @"
 ;;
 
-let draw_map (state : Types.state) =
+let draw_map (state : Types.game_state) =
   draw_terrain state;
   draw_players state;
   ignore (Curses.wnoutrefresh state.ui.map_win)
 ;;
 
-let draw_log (state : Types.state) =
+let draw_log (state : Types.game_state) =
   let w = state.ui.log_win in
   let _, win_w = Curses.getmaxyx w in
   let inner_w = max 1 (win_w - 2) in
@@ -228,7 +248,7 @@ let draw_log (state : Types.state) =
   ignore (Curses.wnoutrefresh w)
 ;;
 
-let draw_chat (state : Types.state) =
+let draw_chat (state : Types.game_state) =
   let w = state.ui.chat_win in
   let prompt = "> " in
   let prompt_len = String.length prompt in
@@ -246,20 +266,29 @@ let draw_chat (state : Types.state) =
 ;;
 
 (* --- Master render function --- *)
-let draw_all (state : Types.state) =
-  (* Base windows *)
-  draw_terrain state;
-  draw_players state;
-  ignore (Curses.wnoutrefresh state.ui.map_win);
-  draw_log state;
-  draw_chat state;
-  (* Popups *)
-  (match state.popup with
+let draw_app (state : Types.client_state) =
+  let h, w = Curses.get_size () in
+  ignore (Curses.curs_set 0);
+  (* Hide cursor by default *)
+  let active_popup =
+    match state.mode with
+    | Title t ->
+      draw_title_screen h w;
+      t.popup
+    | Game g ->
+      draw_terrain g;
+      draw_players g;
+      ignore (Curses.wnoutrefresh g.ui.map_win);
+      draw_log g;
+      draw_chat g;
+      g.popup
+  in
+  (* Popups render on top of EVERYTHING *)
+  (match active_popup with
    | Types.NoPopup -> ()
    | Types.ChoiceMenu { title; options; selected; _ } ->
-     Modals.draw_choice_menu state.ui.height state.ui.width title options selected
-   | Types.MessageBox { title; message } ->
-     Modals.draw_message_box state.ui.height state.ui.width title message);
-  (* Composite everything and push to screen! *)
+     Modals.draw_choice_menu h w title options selected
+   | Types.MessageBox { title; message } -> Modals.draw_message_box h w title message
+   | Types.Form { title; fields; cursor; _ } -> Modals.draw_form h w title fields cursor);
   ignore (Curses.doupdate ())
 ;;

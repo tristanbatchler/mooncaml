@@ -6,7 +6,7 @@ type window_focus =
   | LogWindow
   | ChatWindow
 
-type ui =
+type game_ui =
   { map_win : Curses.window
   ; log_win : Curses.window
   ; chat_win : Curses.window
@@ -19,7 +19,18 @@ type edit_line =
   ; cursor : int
   }
 
+type form_id =
+  | FormLogin
+  | FormRegister
+
+type form_field =
+  { label : string
+  ; is_secret : bool
+  ; edit : edit_line
+  }
+
 type menu_id =
+  | MenuTitle
   | MenuQuit
   | MenuConfirmQuit
   | MenuInspect
@@ -36,16 +47,33 @@ type popup_state =
       { title : string
       ; message : string
       }
+  | Form of
+      { title : string
+      ; fields : form_field array
+      ; cursor : int
+      ; id : form_id
+      }
 
-type state =
-  { ui : ui
+type title_state = { popup : popup_state }
+
+type game_state =
+  { ui : game_ui
   ; log : string list
   ; chat : edit_line
   ; player : Entities.player
   ; focus : window_focus
   ; log_scroll_offset : int
-  ; send_packets : Packet.t list
   ; other_players : Entities.player IntMap.t
   ; map : Maps.map_data
   ; popup : popup_state
+  ; send_packets : Packet.t list
+  }
+
+type app_mode =
+  | Title of title_state
+  | Game of game_state
+
+type client_state =
+  { mode : app_mode
+  ; send_packets : Packet.t list
   }

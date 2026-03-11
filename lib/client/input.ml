@@ -7,7 +7,7 @@ module Log_lwt = (val Logs_lwt.src_log src : Logs_lwt.LOG)
 
 let max_log = 256
 
-let add_log msg (state : Types.state) =
+let add_log msg (state : Types.game_state) =
   let log = Util.take max_log (msg :: state.log) in
   (* If scrolled up, bump offset so the visible content stays frozen *)
   let offset = if state.log_scroll_offset > 0 then state.log_scroll_offset + 1 else 0 in
@@ -23,25 +23,15 @@ let is_cursor_down_key c = c = Curses.Key.down || c = Char.code 'j'
 
 (* ----- From other clients (forwarded by the server) -------------------------- *)
 
-let move_player dx dy (state : Types.state) =
+let move_player dx dy (state : Types.game_state) =
   let desired_x = state.player.x + dx in
   let desired_y = state.player.y + dy in
   if desired_x < 0 || desired_y < 0 || desired_x >= state.map.width || desired_y >= state.map.height
   then state
   else (
-    let terrain = state.map.terrain_map.(desired_y).(desired_x) in
-    let can_move =
-      match terrain with
-      | Grass | Dirt -> true
-      | _ -> false
-    in
-    if not can_move
-    then state
-    else
-      { state with
-        player = { state.player with x = desired_x; y = desired_y }
-      ; send_packets = Packet.MoveCommand { x = desired_x; y = desired_y } :: state.send_packets
-      })
+    match state.map.terrain_map.(desired_y).(desired_x) with
+    | Grass | Dirt -> { state with player = { state.player with x = desired_x; y = desired_y } }
+    | _ -> state)
 ;;
 
 let next_focus = function
@@ -56,7 +46,7 @@ let prev_focus = function
   | Types.ChatWindow -> Types.LogWindow
 ;;
 
-let handle_map_input (state : Types.state) ch =
+let handle_map_input (state : Types.game_state) ch =
   match ch with
   | c when c = Curses.Key.up -> state |> move_player 0 (-1)
   | c when c = Curses.Key.down -> state |> move_player 0 1
@@ -66,7 +56,7 @@ let handle_map_input (state : Types.state) ch =
   | _ -> state
 ;;
 
-let handle_log_input (state : Types.state) ch =
+let handle_log_input (state : Types.game_state) ch =
   let log_len = List.length state.log in
   let avail_rows = Windows.log_height - 2 in
   let max_offset = max 0 (log_len - avail_rows) in
@@ -86,7 +76,7 @@ let handle_log_input (state : Types.state) ch =
     { state with log_scroll_offset = clamped }
 ;;
 
-let handle_chat_input (state : Types.state) ch =
+let handle_chat_input (state : Types.game_state) ch =
   let ed = state.chat in
   let just_edit ed' = { state with chat = ed' } in
   match ch with
@@ -112,7 +102,7 @@ let handle_chat_input (state : Types.state) ch =
   | _ -> state
 ;;
 
-let confirm_quit_game (state : Types.state) =
+let confirm_quit_game (state : Types.game_state) =
   { state with
     popup =
       Types.ChoiceMenu
@@ -124,50 +114,149 @@ let confirm_quit_game (state : Types.state) =
   }
 ;;
 
-let handle_menu_choice (state : Types.state) id selected_index =
+let update_form_field (fields : Types.form_field array) cursor f =
+  let field = fields.(cursor) in
+  let new_fields = Array.copy fields in
+  new_fields.(cursor) <- { field with edit = f field.edit };
+  new_fields
+;;
+
+let handle_form_submit (c_state : Types.client_state) id (fields : Types.form_field array) =
+  let username = fields.(0).edit.text in
+  let password = fields.(1).edit.text in
+  let packet =
+    match id with
+    | Types.FormLogin -> Packet.LoginCommand { username; password }
+    | Types.FormRegister -> Packet.RegisterCommand { username; password }
+  in
+  { c_state with send_packets = packet :: c_state.send_packets }
+;;
+
+let handle_menu_choice (state : Types.game_state) id selected_index =
   match id with
   | Types.MenuQuit ->
     if selected_index = 1 then confirm_quit_game state else { state with popup = NoPopup }
   | Types.MenuConfirmQuit -> if selected_index = 1 then exit 0 else { state with popup = NoPopup }
   | Types.MenuInspect -> state (* Placeholder for future menu *)
+  | Types.MenuTitle -> state (* Placeholder for future menu *)
 ;;
 
-let handle_input (state : Types.state) ch =
-  match state.popup with
-  | Types.ChoiceMenu { title; options; selected; id } ->
+let handle_popup_input (c_state : Types.client_state) popup ch =
+  let open Types in
+  match popup with
+  | ChoiceMenu { title; options; selected; id } ->
     let max_idx = List.length options - 1 in
     (match ch with
-     | c when is_cursor_up_key c ->
-       { state with popup = ChoiceMenu { title; options; id; selected = max 0 (selected - 1) } }
-     | c when is_cursor_down_key c ->
-       { state with
-         popup = ChoiceMenu { title; options; id; selected = min max_idx (selected + 1) }
-       }
-     | c when is_return_key c -> handle_menu_choice state id selected
-     | c when is_escape_key c -> { state with popup = NoPopup }
-     | _ -> state)
-  | Types.MessageBox _ ->
-    if is_escape_key ch || is_return_key ch then { state with popup = NoPopup } else state
-  | Types.NoPopup ->
-    if ch = Char.code '\t'
-    then { state with focus = next_focus state.focus }
-    else if ch = Curses.Key.btab
-    then { state with focus = prev_focus state.focus }
-    else if is_escape_key ch && state.focus <> Types.ChatWindow
-    then
-      (* Spawn our generic quit menu! *)
-      { state with
-        popup =
-          Types.ChoiceMenu
-            { title = "Quit Game?"
-            ; options = [ "Resume"; "Quit" ]
-            ; selected = 0
-            ; id = Types.MenuQuit
-            }
-      }
+     | c when is_cursor_up_key c || c = Curses.Key.btab ->
+       ChoiceMenu { title; options; id; selected = max 0 (selected - 1) }, c_state.send_packets
+     | c when is_cursor_down_key c || c = Char.code '\t' ->
+       ( ChoiceMenu { title; options; id; selected = min max_idx (selected + 1) }
+       , c_state.send_packets )
+     | c when is_return_key c ->
+       if id = MenuTitle && selected = 0
+       then
+         ( Form
+             { title = "Login"
+             ; id = FormLogin
+             ; cursor = 0
+             ; fields =
+                 [| { label = "User"; is_secret = false; edit = Textbox.empty_edit }
+                  ; { label = "Pass"; is_secret = true; edit = Textbox.empty_edit }
+                 |]
+             }
+         , [] )
+       else if id = MenuTitle && selected = 1
+       then
+         ( Form
+             { title = "Register"
+             ; id = FormRegister
+             ; cursor = 0
+             ; fields =
+                 [| { label = "User"; is_secret = false; edit = Textbox.empty_edit }
+                  ; { label = "Pass"; is_secret = true; edit = Textbox.empty_edit }
+                 |]
+             }
+         , [] )
+       else if selected = 2
+       then exit 0
+       else NoPopup, []
+     | _ -> popup, c_state.send_packets)
+  | Form { title; fields; cursor; id } ->
+    let num_fields = Array.length fields in
+    let max_cursor = num_fields + 1 in
+    (* 0=User, 1=Pass, 2=Submit, 3=Cancel *)
+    (match ch with
+     | c when is_cursor_up_key c || c = Curses.Key.btab ->
+       Form { title; fields; id; cursor = max 0 (cursor - 1) }, []
+     | c when is_cursor_down_key c || c = Char.code '\t' ->
+       Form { title; fields; id; cursor = min max_cursor (cursor + 1) }, []
+     | c when is_return_key c ->
+       if cursor < num_fields
+       then
+         (* Pressing Enter on a textbox moves to the next field *)
+         Form { title; fields; id; cursor = cursor + 1 }, []
+       else if cursor = num_fields
+       then
+         (* Pressing Enter on Submit Button! *)
+         NoPopup, (handle_form_submit c_state id fields).send_packets
+       else
+         (* Pressing Enter on Cancel Button! *)
+         ( ChoiceMenu
+             { title = "Mooncaml"
+             ; options = [ "Login"; "Register"; "Quit" ]
+             ; selected = 0
+             ; id = MenuTitle
+             }
+         , [] )
+     | c when is_escape_key c ->
+       ( ChoiceMenu
+           { title = "Mooncaml"
+           ; options = [ "Login"; "Register"; "Quit" ]
+           ; selected = 0
+           ; id = MenuTitle
+           }
+       , [] )
+     | c when cursor < num_fields ->
+       (* Text editing only applies if we are highlighting a textbox! *)
+       let apply f = Form { title; fields = update_form_field fields cursor f; cursor; id }, [] in
+       if c = Curses.Key.backspace || c = Char.code '\x7f'
+       then apply Textbox.edit_backspace
+       else if c = Curses.Key.left
+       then apply (fun e -> { e with cursor = max 0 (e.cursor - 1) })
+       else if c = Curses.Key.right
+       then apply (fun e -> { e with cursor = min (String.length e.text) (e.cursor + 1) })
+       else if is_printable c
+       then apply (fun e -> Textbox.edit_insert e c)
+       else popup, []
+     | _ -> popup, [])
+  | MessageBox _ -> if is_escape_key ch || is_return_key ch then NoPopup, [] else popup, []
+  | NoPopup -> NoPopup, []
+;;
+
+let handle_input (state : Types.client_state) ch =
+  match state.mode with
+  | Title t ->
+    let new_popup, new_packets = handle_popup_input state t.popup ch in
+    Types.{ mode = Title { popup = new_popup }; send_packets = new_packets }
+  | Game g ->
+    if g.popup <> NoPopup
+    then (
+      let new_popup, new_packets = handle_popup_input state g.popup ch in
+      Types.{ mode = Game { g with popup = new_popup }; send_packets = new_packets })
     else (
-      match state.focus with
-      | MapWindow -> handle_map_input state ch
-      | LogWindow -> handle_log_input state ch
-      | ChatWindow -> handle_chat_input state ch)
+      let new_g =
+        if ch = Char.code '\t'
+        then { g with focus = next_focus g.focus }
+        else if ch = Curses.Key.btab
+        then { g with focus = prev_focus g.focus }
+        else if is_escape_key ch && g.focus <> ChatWindow
+        then confirm_quit_game g
+        else (
+          match g.focus with
+          | MapWindow -> handle_map_input g ch
+          | LogWindow -> handle_log_input g ch
+          | ChatWindow -> handle_chat_input g ch)
+      in
+      (* Merge game packets into state packets *)
+      Types.{ mode = Game new_g; send_packets = new_g.send_packets @ state.send_packets })
 ;;

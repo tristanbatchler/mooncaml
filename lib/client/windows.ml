@@ -1,7 +1,7 @@
 let log_height = 8
 let chat_height = 1
 
-let destroy_windows (ui : Types.ui) =
+let destroy_windows (ui : Types.game_ui) =
   ignore (Curses.delwin ui.map_win);
   ignore (Curses.delwin ui.log_win);
   ignore (Curses.delwin ui.chat_win)
@@ -18,15 +18,15 @@ let create_windows () =
   Types.{ map_win; log_win; chat_win; width = w; height = h }
 ;;
 
-let handle_resize (state : Types.state) =
+let handle_resize (ui : Types.game_ui) =
   let h, w = Curses.get_size () in
-  if h <> state.ui.height || w <> state.ui.width
+  if h <> ui.height || w <> ui.width
   then (
     Curses.endwin ();
     ignore (Curses.refresh ());
-    destroy_windows state.ui;
+    destroy_windows ui;
     Curses.clear ();
     ignore (Curses.refresh ());
-    { state with ui = create_windows () })
-  else state
+    create_windows ())
+  else ui
 ;;

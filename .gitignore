@@ -38,3 +38,4 @@ _opam/
 ProjectSummary.md
 client.log
 .env
+.envrc
