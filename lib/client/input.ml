@@ -18,8 +18,6 @@ let add_logf fmt = Printf.ksprintf (fun msg state -> add_log msg state) fmt
 let is_printable ch = ch >= Char.code ' ' && ch <= Char.code '~'
 let is_return_key c = c = Curses.Key.enter || c = Char.code '\n'
 let is_escape_key c = c = Char.code '\x1b'
-let is_cursor_up_key c = c = Curses.Key.up || c = Char.code 'k'
-let is_cursor_down_key c = c = Curses.Key.down || c = Char.code 'j'
 
 (* ----- From other clients (forwarded by the server) -------------------------- *)
 
@@ -57,6 +55,8 @@ let handle_map_input (state : Types.game_state) ch =
 ;;
 
 let handle_log_input (state : Types.game_state) ch =
+  let is_cursor_up_key c = c = Curses.Key.up || c = Char.code 'k' in
+  let is_cursor_down_key c = c = Curses.Key.down || c = Char.code 'j' in
   let log_len = List.length state.log in
   let avail_rows = Windows.log_height - 2 in
   let max_offset = max 0 (log_len - avail_rows) in
@@ -143,6 +143,8 @@ let handle_menu_choice (state : Types.game_state) id selected_index =
 
 let handle_popup_input (c_state : Types.client_state) popup ch =
   let open Types in
+  let is_cursor_up_key c = c = Curses.Key.up in
+  let is_cursor_down_key c = c = Curses.Key.down in
   match popup with
   | ChoiceMenu { title; options; selected; id } ->
     let max_idx = List.length options - 1 in
@@ -190,6 +192,14 @@ let handle_popup_input (c_state : Types.client_state) popup ch =
        Form { title; fields; id; cursor = max 0 (cursor - 1) }, []
      | c when is_cursor_down_key c || c = Char.code '\t' ->
        Form { title; fields; id; cursor = min max_cursor (cursor + 1) }, []
+     (* --- NEW: Left/Right Button Navigation --- *)
+     | c when c = Curses.Key.left && cursor >= num_fields ->
+       (* If on Cancel (3), move to Submit (2) *)
+       Form { title; fields; id; cursor = num_fields }, []
+     | c when c = Curses.Key.right && cursor >= num_fields ->
+       (* If on Submit (2), move to Cancel (3) *)
+       Form { title; fields; id; cursor = num_fields + 1 }, []
+       (* ----------------------------------------- *)
      | c when is_return_key c ->
        if cursor < num_fields
        then
@@ -221,10 +231,16 @@ let handle_popup_input (c_state : Types.client_state) popup ch =
        let apply f = Form { title; fields = update_form_field fields cursor f; cursor; id }, [] in
        if c = Curses.Key.backspace || c = Char.code '\x7f'
        then apply Textbox.edit_backspace
+       else if c = Curses.Key.dc
+       then apply Textbox.edit_delete
        else if c = Curses.Key.left
        then apply (fun e -> { e with cursor = max 0 (e.cursor - 1) })
        else if c = Curses.Key.right
        then apply (fun e -> { e with cursor = min (String.length e.text) (e.cursor + 1) })
+       else if c = Curses.Key.home
+       then apply (fun e -> { e with cursor = 0 })
+       else if c = Curses.Key.end_
+       then apply (fun e -> { e with cursor = String.length e.text })
        else if is_printable c
        then apply (fun e -> Textbox.edit_insert e c)
        else popup, []

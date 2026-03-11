@@ -81,7 +81,7 @@ let draw_form win_h win_w title fields cursor =
        if i = cursor
        then (
          hw_cursor_y := start_y + row;
-         hw_cursor_x := start_x + col + 5 + max_label_len + field.edit.cursor))
+         hw_cursor_x := start_x + col + max_label_len + 3 + field.edit.cursor))
     fields;
   (* Draw Submit Button (Index = num_fields) *)
   let submit_idx = num_fields in
