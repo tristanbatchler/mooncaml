@@ -66,7 +66,6 @@ let handle_packet (state : Types.client_state) packet =
       ; player = your_player
       ; focus = MapWindow
       ; log_scroll_offset = 0
-      ; send_packets = []
       ; other_players = others_map
       ; map
       ; popup = NoPopup
@@ -125,12 +124,15 @@ let rec app_loop (state : Types.client_state) ic oc =
     | Game g -> { state with mode = Game { g with ui = Windows.handle_resize g.ui } }
     | Title _ -> state
   in
+  (* Send packets and IMMEDIATELY generate a clean state *)
   let* () = send_out_packets oc (List.rev state.send_packets) in
-  let state = { state with send_packets = [] } in
-  Drawing.draw_app state;
+  let clean_state = { state with send_packets = [] } in
+  Drawing.draw_app clean_state;
   let ch = Curses.getch () in
   let next_state =
-    if ch <> -1 && ch <> Curses.Key.resize then Input.handle_input state ch else state
+    if ch <> -1 && ch <> Curses.Key.resize
+    then Input.handle_input clean_state ch (* Pass the clean state! *)
+    else clean_state
   in
   let* () = Lwt.pause () in
   app_loop next_state ic oc

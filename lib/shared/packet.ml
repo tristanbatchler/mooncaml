@@ -23,6 +23,7 @@ type t =
       { username : string
       ; password : string
       }
+  | LogoutCommand
   (* From another client (forwarded by the server) *)
   | ChatEvent of
       { sender_id : int

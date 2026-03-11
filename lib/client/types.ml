@@ -31,7 +31,7 @@ type form_field =
 
 type menu_id =
   | MenuTitle
-  | MenuQuit
+  | MenuInGameEscape
   | MenuConfirmQuit
   | MenuInspect
 
@@ -66,7 +66,6 @@ type game_state =
   ; other_players : Entities.player IntMap.t
   ; map : Maps.map_data
   ; popup : popup_state
-  ; send_packets : Packet.t list
   }
 
 type app_mode =
