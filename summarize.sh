@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
 
+
 # Output file
 outputFile="ProjectSummary.md"
+
+
+# Argument flags
+no_server=false
+no_client=false
+no_bmp2ml=false
+
+# Parse command line arguments
+for arg in "$@"; do
+    case $arg in
+        --no-server)
+            no_server=true
+            ;;
+        --no-client)
+            no_client=true
+            ;;
+        --no-bmp2ml)
+            no_bmp2ml=true
+            ;;
+    esac
+done
 
 # Write header (overwrite file)
 echo -e "# Project Summary\n" > "$outputFile"
@@ -23,6 +45,33 @@ git ls-files | grep -E "$regex" | while IFS= read -r file; do
             continue
             ;;
     esac
+
+    # Exclude server files if --no-server
+    if $no_server; then
+        case "$file" in
+            lib/server/*|bin/server_app.ml)
+                continue
+                ;;
+        esac
+    fi
+
+    # Exclude client files if --no-client
+    if $no_client; then
+        case "$file" in
+            lib/client/*|bin/client_app.ml)
+                continue
+                ;;
+        esac
+    fi
+
+    # Exclude bmp2ml file if --no-bmp2ml
+    if $no_bmp2ml; then
+        case "$file" in
+            bin/bmp2ml.ml)
+                continue
+                ;;
+        esac
+    fi
 
     # Extract lowercase extension
     ext=".${file##*.}"

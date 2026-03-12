@@ -19,7 +19,9 @@ let handle_move_event sender_id x y (state : Types.game_state) =
 ;;
 
 let handle_player_info (player_info : Entities.player) (state : Types.game_state) =
-  { state with other_players = Types.IntMap.add player_info.id player_info state.other_players }
+  { state with
+    other_players = Types.IntMap.add player_info.client_id player_info state.other_players
+  }
   |> Input.add_logf "%s appeared at (%d, %d)" player_info.name player_info.x player_info.y
 ;;
 
@@ -55,7 +57,7 @@ let handle_packet (state : Types.client_state) packet =
     in
     let others_map =
       List.fold_left
-        (fun m (p : Entities.player) -> Types.IntMap.add p.id p m)
+        (fun m (p : Entities.player) -> Types.IntMap.add p.client_id p m)
         Types.IntMap.empty
         other_players
     in

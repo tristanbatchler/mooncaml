@@ -1,7 +1,7 @@
 open Sexplib.Std
 
 type player =
-  { id : int
+  { client_id : int
   ; name : string
   ; x : int
   ; y : int

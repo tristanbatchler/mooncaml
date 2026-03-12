@@ -67,11 +67,11 @@ module StateInLobby = struct
         let* () = Log_lwt.info (fun m -> m "User %s authenticated successfully" username) in
         let* player_res = Db.Repository.get_player_opt_by_user_id client.db_pool user_id in
         match player_res with
-        | Ok (Some (entity_id, x, y, display_name)) ->
-          let player = Entities.{ id = entity_id; name = display_name; x; y } in
+        | Ok (Some (_, x, y, display_name)) ->
+          let player = Entities.{ client_id = client.id; name = display_name; x; y } in
           client.add_player_to_world player;
           let other_players =
-            client.get_all_players () |> List.filter (fun p -> p.Entities.id <> entity_id)
+            client.get_all_players () |> List.filter (fun p -> p.Entities.client_id <> client.id)
           in
           let welcome =
             Packet.WelcomeEvent { your_player = player; other_players; map_name = client.map.name }
