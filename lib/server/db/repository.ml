@@ -37,9 +37,7 @@ let get_player_opt_by_user_id pool user_id =
       Db.find_opt Queries.get_player_by_user_id user_id)
   in
   match Util.unwrap_result res with
-  (* Unpack the exact t4 tuple we defined in queries.ml! *)
   | Ok (Some (entity_id, x, y, display_name)) ->
-    (* Return it in a clean format for client.ml to use *)
     Lwt.return (Ok (Some (entity_id, x, y, display_name)))
   | Ok None -> Lwt.return (Ok None)
   | Error msg -> Lwt.return (Error msg)
@@ -55,6 +53,14 @@ let create_player pool user_id map_name x y display_name =
         (* Step 2: Insert Player using the returned entity_id *)
         Db.exec Queries.create_player (user_id, entity_id, display_name)
       | Error e -> Lwt.return (Error e))
+  in
+  Lwt.return (Util.unwrap_result res)
+;;
+
+let update_player_position pool entity_id x y =
+  let* res =
+    Util.with_connection pool (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.exec Queries.update_player_position (entity_id, x, y))
   in
   Lwt.return (Util.unwrap_result res)
 ;;
