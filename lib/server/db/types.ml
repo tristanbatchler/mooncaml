@@ -7,9 +7,4 @@ type config =
   ; pool_size : int
   }
 
-type pool =
-  { connections : (module Caqti_lwt.CONNECTION) Queue.t
-  ; mutex : Lwt_mutex.t
-  ; max_size : int
-  ; uri : Uri.t
-  }
+type pool = (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt_unix.Pool.t

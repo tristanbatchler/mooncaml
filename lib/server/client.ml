@@ -62,7 +62,7 @@ module StateInLobby = struct
   let handle_login_command client username password =
     let* user_res = Db.Repository.get_user_opt_by_username client.db_pool username in
     match user_res with
-    | Ok (Some (user_id, _, hash)) ->
+    | Ok (Some (user_id, hash)) ->
       if verify_password ~encoded:hash ~pwd:password
       then
         let* () = Log_lwt.info (fun m -> m "User %s authenticated successfully" username) in
