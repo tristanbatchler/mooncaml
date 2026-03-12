@@ -9,7 +9,10 @@ module Db = Mooncaml_server_db
 
 type session_state =
   | Lobby
-  | InGame of Entities.player
+  | InGame of
+      { player : Entities.player
+      ; user_id : int
+      }
 
 type t =
   { id : int
@@ -58,7 +61,7 @@ module StateInLobby = struct
   let handle_login_command client username password =
     let* user_opt = Db.Queries.get_user_opt_by_username client.db_pool username in
     match user_opt with
-    | Ok (Ok (Some (_, hash))) ->
+    | Some { id = user_id; password_hash = hash; _ } ->
       if verify_password ~encoded:hash ~pwd:password
       then
         let* () = Log_lwt.info (fun m -> m "User %s authenticated successfully" username) in
@@ -71,7 +74,7 @@ module StateInLobby = struct
         in
         let* () = Packet.send client.oc welcome in
         let* () = client.broadcast (Packet.PlayerInfoEvent player) client.id in
-        Lwt.return (InGame player)
+        Lwt.return (InGame { player; user_id })
       else
         let* () =
           Log_lwt.warn (fun m -> m "Failed login attempt for user %s: incorrect password" username)
@@ -82,23 +85,20 @@ module StateInLobby = struct
             (Packet.LoginCommandResponse (false, "Invalid username or password"))
         in
         Lwt.return Lobby
-    | Ok (Ok None) ->
+    | None ->
       let* () = Packet.send client.oc (Packet.LoginCommandResponse (false, "User not found")) in
-      Lwt.return Lobby
-    | _ ->
-      let* () = Packet.send client.oc (Packet.UnexpectedServerError "Database error") in
       Lwt.return Lobby
   ;;
 
   let handle_register_command client username password =
     let* user_opt = Db.Queries.get_user_opt_by_username client.db_pool username in
     match user_opt with
-    | Ok (Ok (Some _)) ->
+    | Some _ ->
       let* () =
         Packet.send client.oc (Packet.RegisterCommandResponse (false, "Username already taken"))
       in
       Lwt.return Lobby
-    | Ok (Ok None) ->
+    | None ->
       let hash_res =
         try
           let hash = hash_password password in
@@ -125,9 +125,6 @@ module StateInLobby = struct
        | Error _ ->
          let* () = Packet.send client.oc (Packet.UnexpectedServerError "Crypto error") in
          Lwt.return Lobby)
-    | _ ->
-      let* () = Packet.send client.oc (Packet.UnexpectedServerError "Database error") in
-      Lwt.return Lobby
   ;;
 
   let handle_packet client packet =
@@ -143,7 +140,7 @@ module StateInLobby = struct
 end
 
 module StateInGame = struct
-  let handle_chat_command client player (packet : Packet.t) =
+  let handle_chat_command client (player : Entities.player) user_id (packet : Packet.t) =
     match packet with
     | Packet.ChatCommand msg ->
       let* () =
@@ -154,11 +151,11 @@ module StateInGame = struct
           client.oc
           (Packet.ChatCommandResponse (true, "Message broadcasted successfully"))
       in
-      Lwt.return (InGame player)
+      Lwt.return (InGame { player; user_id })
     | _ -> raise (Invalid_argument "Received non-chat packet in handle_chat_command")
   ;;
 
-  let handle_move_command client player (packet : Packet.t) =
+  let handle_move_command client (player : Entities.player) user_id (packet : Packet.t) =
     match packet with
     | Packet.MoveCommand { x; y } ->
       let success = client.try_move_player x y in
@@ -173,7 +170,7 @@ module StateInGame = struct
         Packet.MoveCommandResponse { success; msg; x = actual_player.x; y = actual_player.y }
       in
       let* () = Packet.send client.oc response in
-      Lwt.return (InGame actual_player)
+      Lwt.return (InGame { player = actual_player; user_id })
     | _ -> raise (Invalid_argument "Received non-move packet in handle_move_command")
   ;;
 
@@ -184,14 +181,14 @@ module StateInGame = struct
     Lwt.return Lobby
   ;;
 
-  let handle_packet client player packet =
+  let handle_packet client (player : Entities.player) user_id packet =
     match packet with
-    | Packet.ChatCommand _ -> handle_chat_command client player packet
-    | Packet.MoveCommand _ -> handle_move_command client player packet
+    | Packet.ChatCommand _ -> handle_chat_command client player user_id packet
+    | Packet.MoveCommand _ -> handle_move_command client player user_id packet
     | Packet.DisconnectCommand | Packet.LogoutCommand -> handle_logout_command client
     | _ ->
       let* () = Log_lwt.warn (fun m -> m "Received unrecognized packet from client %d" client.id) in
-      Lwt.return (InGame player)
+      Lwt.return (InGame { player; user_id })
   ;;
 end
 
@@ -205,7 +202,7 @@ let rec loop client state =
       | Ok packet ->
         (match state with
          | Lobby -> StateInLobby.handle_packet client packet
-         | InGame player -> StateInGame.handle_packet client player packet)
+         | InGame { player; user_id } -> StateInGame.handle_packet client player user_id packet)
       | Error err ->
         let* () = Log_lwt.err (fun m -> m "Parse error from client %d: %s" client.id err) in
         let* () = Packet.send client.oc (Packet.UnexpectedServerError "Failed to parse packet") in
