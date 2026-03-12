@@ -19,20 +19,10 @@ let connection_handler client_addr (ic, oc) db_pool =
 ;;
 
 let initialize_db pool =
-  let* schema_creation_result = Db.Queries.create_schema pool in
+  let* schema_creation_result = Db.Repository.create_schema pool in
   match schema_creation_result with
-  | Ok (Ok ()) -> Log_lwt.info (fun m -> m "Database schema ensured")
-  | Ok (Error err) ->
-    let err_msg = Caqti_error.show err in
-    let* () = Log_lwt.err (fun m -> m "FATAL: Failed to create database schema: %s" err_msg) in
-    Lwt.fail_with "Database initialization failed"
-  | Error err ->
-    let err_msg =
-      match err with
-      | `Connection_error e -> e
-      | `Request_error e -> Caqti_error.show e
-      | _ -> "Unknown error"
-    in
+  | Ok () -> Log_lwt.info (fun m -> m "Database schema ensured")
+  | Error err_msg ->
     let* () = Log_lwt.err (fun m -> m "FATAL: Failed to create database schema: %s" err_msg) in
     Lwt.fail_with "Database initialization failed"
 ;;

@@ -69,3 +69,13 @@ let with_connection (pool : Types.pool) f =
          Lwt.return (Ok r))
       (fun () -> return_connection pool conn)
 ;;
+
+let unwrap_result = function
+  | Ok (Ok x) -> Ok x
+  | Ok (Error e) ->
+    Logs.err (fun m -> m "DB Request Error: %s" (Caqti_error.show e));
+    Error "Database query failed"
+  | Error _ ->
+    Logs.err (fun m -> m "DB Connection Error: Failed to acquire connection from pool");
+    Error "Database connection failed"
+;;

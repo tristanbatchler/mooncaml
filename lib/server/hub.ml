@@ -58,8 +58,7 @@ let remove_player_from_world client_id =
   modify (fun st -> { st with players = IntMap.remove client_id st.players })
 ;;
 
-(* --- RESTORED: Hub owns the spawning logic! --- *)
-let spawn_player client_id username =
+let add_player_to_world client_id (player : Entities.player) =
   let st = !state in
   let rec spawn_point () =
     let x = Random.int st.map.width in
@@ -69,9 +68,8 @@ let spawn_player client_id username =
     | _ -> spawn_point ()
   in
   let x, y = spawn_point () in
-  let player = Entities.{ id = client_id; name = username; x; y } in
-  modify (fun s -> { s with players = IntMap.add client_id player s.players });
-  player
+  let player' = Entities.{ player with x; y } in
+  modify (fun s -> { s with players = IntMap.add client_id player' s.players })
 ;;
 
 let add_client (ic, oc) db_pool =
@@ -85,7 +83,7 @@ let add_client (ic, oc) db_pool =
     ; broadcast
     ; try_move_player = try_move_player id
     ; get_all_players
-    ; spawn_player = spawn_player id
+    ; add_player_to_world = add_player_to_world id
     ; remove_player_from_world
     }
   in

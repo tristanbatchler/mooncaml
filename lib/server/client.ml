@@ -23,7 +23,7 @@ type t =
   ; broadcast : Packet.t -> int -> unit Lwt.t
   ; try_move_player : int -> int -> bool
   ; get_all_players : unit -> Entities.player list
-  ; spawn_player : string -> Entities.player
+  ; add_player_to_world : Entities.player -> unit
   ; remove_player_from_world : int -> unit
   }
 
@@ -59,72 +59,96 @@ let verify_password ~encoded ~pwd =
 
 module StateInLobby = struct
   let handle_login_command client username password =
-    let* user_opt = Db.Queries.get_user_opt_by_username client.db_pool username in
-    match user_opt with
-    | Some { id = user_id; password_hash = hash; _ } ->
+    let* user_res = Db.Repository.get_user_opt_by_username client.db_pool username in
+    match user_res with
+    | Ok (Some (user_id, _, hash)) ->
       if verify_password ~encoded:hash ~pwd:password
       then
         let* () = Log_lwt.info (fun m -> m "User %s authenticated successfully" username) in
-        let player = client.spawn_player username in
-        let other_players =
-          client.get_all_players () |> List.filter (fun (p : Entities.player) -> p.id <> client.id)
-        in
-        let welcome =
-          Packet.WelcomeEvent { your_player = player; other_players; map_name = client.map.name }
-        in
-        let* () = Packet.send client.oc welcome in
-        let* () = client.broadcast (Packet.PlayerInfoEvent player) client.id in
-        Lwt.return (InGame { player; user_id })
+        let* player_res = Db.Repository.get_player_opt_by_user_id client.db_pool user_id in
+        match player_res with
+        | Ok (Some (entity_id, x, y, display_name)) ->
+          let player = Entities.{ id = entity_id; name = display_name; x; y } in
+          client.add_player_to_world player;
+          let other_players =
+            client.get_all_players () |> List.filter (fun p -> p.Entities.id <> entity_id)
+          in
+          let welcome =
+            Packet.WelcomeEvent { your_player = player; other_players; map_name = client.map.name }
+          in
+          let* () = Packet.send client.oc welcome in
+          let* () = client.broadcast (Packet.PlayerInfoEvent player) client.id in
+          Lwt.return (InGame { player; user_id })
+        | Ok None ->
+          (* This should never happen if registration works correctly, but just in case: *)
+          let* () =
+            Packet.send client.oc (Packet.UnexpectedServerError "Player profile not found!")
+          in
+          Lwt.return Lobby
+        | Error db_err ->
+          let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
+          Lwt.return Lobby
+        (* ------------------------------------------------- *)
       else
-        let* () =
-          Log_lwt.warn (fun m -> m "Failed login attempt for user %s: incorrect password" username)
-        in
+        let* () = Log_lwt.warn (fun m -> m "Failed login attempt for user %s" username) in
         let* () =
           Packet.send
             client.oc
             (Packet.LoginCommandResponse (false, "Invalid username or password"))
         in
         Lwt.return Lobby
-    | None ->
+    | Ok None ->
       let* () = Packet.send client.oc (Packet.LoginCommandResponse (false, "User not found")) in
+      Lwt.return Lobby
+    | Error db_err ->
+      let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
       Lwt.return Lobby
   ;;
 
   let handle_register_command client username password =
-    let* user_opt = Db.Queries.get_user_opt_by_username client.db_pool username in
-    match user_opt with
-    | Some _ ->
+    (* Call the Repository instead of Queries! *)
+    let* user_res = Db.Repository.get_user_opt_by_username client.db_pool username in
+    match user_res with
+    | Ok (Some _) ->
       let* () =
         Packet.send client.oc (Packet.RegisterCommandResponse (false, "Username already taken"))
       in
       Lwt.return Lobby
-    | None ->
+    | Ok None ->
       let hash_res =
-        try
-          let hash = hash_password password in
-          Ok ((), hash)
-        with
+        try Ok (hash_password password) with
         | e -> Error (Printexc.to_string e)
       in
       (match hash_res with
-       | Ok (_, hash) ->
-         let* insert_result = Db.Queries.create_user client.db_pool username hash in
-         (match insert_result with
-          | Ok (Ok ()) ->
-            let* () = Log_lwt.info (fun m -> m "User %s registered successfully" username) in
-            let* () =
-              Packet.send
-                client.oc
-                (Packet.RegisterCommandResponse
-                   (true, "Registration successful! You may now log in."))
+       | Ok hash ->
+         let* create_user_res = Db.Repository.create_user client.db_pool username hash in
+         (match create_user_res with
+          | Ok user_id ->
+            let* create_player_res =
+              Db.Repository.create_player client.db_pool user_id client.map.name 60 60 username
             in
-            Lwt.return Lobby
-          | _ ->
-            let* () = Packet.send client.oc (Packet.UnexpectedServerError "Database error") in
+            (match create_player_res with
+             | Ok () ->
+               let* () = Log_lwt.info (fun m -> m "User %s registered successfully" username) in
+               let* () =
+                 Packet.send
+                   client.oc
+                   (Packet.RegisterCommandResponse
+                      (true, "Registration successful! You may now log in."))
+               in
+               Lwt.return Lobby
+             | Error db_err ->
+               let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
+               Lwt.return Lobby)
+          | Error db_err ->
+            let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
             Lwt.return Lobby)
        | Error _ ->
          let* () = Packet.send client.oc (Packet.UnexpectedServerError "Crypto error") in
          Lwt.return Lobby)
+    | Error db_err ->
+      let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
+      Lwt.return Lobby
   ;;
 
   let handle_packet client packet =
