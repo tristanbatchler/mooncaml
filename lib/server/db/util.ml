@@ -14,5 +14,9 @@ let build_uri (c : Types.config) =
 let create_pool config =
   let uri = Uri.of_string (build_uri config) in
   let pool_config = Caqti_pool_config.create ~max_size:config.pool_size () in
-  Caqti_lwt_unix.connect_pool ~pool_config uri
+  match Caqti_lwt_unix.connect_pool ~pool_config uri with
+  | Ok pool -> Ok pool
+  | Error err_string ->
+    (* Caqti's connect_pool returns a string error if the URI is bad *)
+    Error (`Connection_error err_string)
 ;;

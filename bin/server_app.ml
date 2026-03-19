@@ -1,6 +1,5 @@
 open Mooncaml_server
 open Mooncaml_shared
-open Lwt.Syntax
 
 let setup_logging () =
   Fmt_tty.setup_std_outputs ();
@@ -32,15 +31,9 @@ let db_config : Mooncaml_server_db.Types.config =
 
 let init_db_and_start_server port =
   Logs.info (fun m -> m "Initializing database connection pool...");
-  let* pool_result = Mooncaml_server_db.Util.create_pool db_config in
-  match pool_result with
-  | Error err ->
-    let err_msg =
-      match err with
-      | `Connection_error e -> e
-      | _ -> "Unknown error"
-    in
-    Logs.err (fun m -> m "FATAL: Failed to connect to database: %s" err_msg);
+  match Mooncaml_server_db.Util.create_pool db_config with
+  | Error (`Connection_error err_msg) ->
+    Logs.err (fun m -> m "FATAL: Failed to connect to database: %s" (Caqti_error.show err_msg));
     Lwt.fail_with "Database initialization failed"
   | Ok pool -> Server.start port pool
 ;;

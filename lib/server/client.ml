@@ -62,24 +62,31 @@ module StateInLobby = struct
   let handle_login_command client username password =
     let* user_res = Db.Repository.get_user_opt_by_username client.db_pool username in
     match user_res with
-    | Ok (Some (user_id, hash)) ->
+    | Ok (Some { id = user_id; username = _; password_hash = hash }) ->
       if verify_password ~encoded:hash ~pwd:password
       then
         let* () = Log_lwt.info (fun m -> m "User %s authenticated successfully" username) in
         let* player_res = Db.Repository.get_player_opt_by_user_id client.db_pool user_id in
         match player_res with
-        | Ok (Some (entity_id, x, y, display_name)) ->
-          let player = Entities.{ client_id = client.id; name = display_name; x; y } in
-          client.add_player_to_world player;
-          let other_players =
-            client.get_all_players () |> List.filter (fun p -> p.Entities.client_id <> client.id)
-          in
-          let welcome =
-            Packet.WelcomeEvent { your_player = player; other_players; map_name = client.map.name }
-          in
-          let* () = Packet.send client.oc welcome in
-          let* () = client.broadcast (Packet.PlayerInfoEvent player) client.id in
-          Lwt.return (InGame { player; user_id; player_entity_id = entity_id })
+        | Ok (Some { user_id; entity_id; display_name }) ->
+          let* pos = Db.Repository.get_player_position client.db_pool entity_id in
+          (match pos with
+           | Ok (x, y) ->
+             let player = Entities.{ client_id = client.id; name = display_name; x; y } in
+             client.add_player_to_world player;
+             let other_players =
+               client.get_all_players () |> List.filter (fun p -> p.Entities.client_id <> client.id)
+             in
+             let welcome =
+               Packet.WelcomeEvent
+                 { your_player = player; other_players; map_name = client.map.name }
+             in
+             let* () = Packet.send client.oc welcome in
+             let* () = client.broadcast (Packet.PlayerInfoEvent player) client.id in
+             Lwt.return (InGame { player; user_id; player_entity_id = entity_id })
+           | Error db_err ->
+             let* () = Packet.send client.oc (Packet.UnexpectedServerError db_err) in
+             Lwt.return Lobby)
         | Ok None ->
           (* This should never happen if registration works correctly, but just in case: *)
           let* () =

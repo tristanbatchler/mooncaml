@@ -83,10 +83,9 @@ let create_entity =
 ;;
 
 let get_player_by_user_id =
-  (* Notice this is t4! We don't need to select user_id because we already know it! *)
-  (Caqti_type.int ->? Caqti_type.(t4 int int int string))
+  (Caqti_type.int ->? Caqti_type.(t2 int string))
   @@ {sql|
-    SELECT e.id, e.x, e.y, p.display_name
+    SELECT e.id, p.display_name
     FROM players p
     JOIN entities e ON p.entity_id = e.id
     WHERE p.user_id = $1;
@@ -110,5 +109,15 @@ let update_player_position =
         y = $3,
         last_update_at = CURRENT_TIMESTAMP
     WHERE id = $1;
+  |sql}
+;;
+
+let get_player_position_by_user_id =
+  (Caqti_type.int ->? Caqti_type.(t2 int int))
+  @@ {sql|
+    SELECT e.x, e.y
+    FROM players p
+    JOIN entities e ON p.entity_id = e.id
+    WHERE p.user_id = $1;
   |sql}
 ;;
